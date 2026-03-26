@@ -1,519 +1,366 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useState } from "react";
+import { MapPin, FlaskConical, CalendarDays, ClipboardList, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { getCurrentWeather, isWeatherError, type WeatherData } from "@/lib/weatherApi";
-import { calculateMix, type MixInputs, type MixResult } from "@/lib/mixCalculator";
-import { APPLICATION_TYPES } from "@/lib/constants";
 
-type Lang = "en" | "th" | "tl" | "id";
-type MixClass = "A" | "B" | "C";
-type SandType = "river" | "crushed" | "mixed";
-type Step = "inputs" | "results";
+import LocationPicker from "@/components/LocationPicker";
+import WeatherDashboard from "@/components/WeatherDashboard";
+import MixClassSelector from "@/components/MixClassSelector";
+import ApplicationSelector from "@/components/ApplicationSelector";
+import ForecastCalendar from "@/components/ForecastCalendar";
+import LifecycleTimeline from "@/components/LifecycleTimeline";
+import ResultsDashboard from "@/components/ResultsDashboard";
 
-const T: Record<Lang, Record<string, string>> = {
-  en: {
-    title: "MixRight",
-    tagline: "Concrete mix for TODAY's weather",
-    getting_weather: "Reading weather...",
-    weather_error: "Can't get weather — enter manually",
-    temp: "Temp",
-    humidity: "Humidity",
-    mix_class: "Mix Class",
-    application: "Application",
-    sand_type: "Sand Type",
-    sand_river: "River sand (smooth)",
-    sand_crushed: "Crushed / manufactured (sharp)",
-    sand_mixed: "Mixed / not sure",
-    cement_age: "Cement bag age",
-    fresh: "Fresh (≤1 month)",
-    one_month: "1–3 months",
-    three_months: "3–6 months",
-    old: "6+ months (degraded)",
-    num_bags: "Number of bags",
-    calculate: "Calculate Mix",
-    water_per_bag: "Water per bag",
-    total_water: "Total water",
-    liters: "L",
-    buckets_per_bag: "Buckets per bag (20L bucket)",
-    cement_b: "Cement",
-    sand_b: "Sand",
-    gravel_b: "Gravel",
-    one_bag: "1 bag",
-    cure_title: "Curing",
-    cure_days: "Keep wet for",
-    days: "days",
-    recalculate: "Recalculate",
-    why_adj: "Why adjusted?",
-    adj_humidity: "Humidity",
-    adj_temp: "Temperature",
-    adj_sand: "Sand type",
-  },
-  th: {
-    title: "MixRight",
-    tagline: "สูตรผสมคอนกรีตสำหรับสภาพอากาศวันนี้",
-    getting_weather: "กำลังอ่านสภาพอากาศ...",
-    weather_error: "ไม่สามารถรับข้อมูลอากาศ — กรอกเอง",
-    temp: "อุณหภูมิ",
-    humidity: "ความชื้น",
-    mix_class: "ชั้นคอนกรีต",
-    application: "ประเภทงาน",
-    sand_type: "ประเภททราย",
-    sand_river: "ทรายแม่น้ำ (เนียน)",
-    sand_crushed: "ทรายหิน (หยาบ)",
-    sand_mixed: "ผสม / ไม่แน่ใจ",
-    cement_age: "อายุถุงปูน",
-    fresh: "ใหม่ (≤1 เดือน)",
-    one_month: "1–3 เดือน",
-    three_months: "3–6 เดือน",
-    old: "6+ เดือน",
-    num_bags: "จำนวนถุง",
-    calculate: "คำนวณส่วนผสม",
-    water_per_bag: "น้ำต่อถุง",
-    total_water: "น้ำรวม",
-    liters: "ลิตร",
-    buckets_per_bag: "ถังต่อถุง (ถัง 20 ลิตร)",
-    cement_b: "ปูน",
-    sand_b: "ทราย",
-    gravel_b: "หิน",
-    one_bag: "1 ถุง",
-    cure_title: "การบ่ม",
-    cure_days: "รักษาความชื้น",
-    days: "วัน",
-    recalculate: "คำนวณใหม่",
-    why_adj: "ทำไมถึงปรับ?",
-    adj_humidity: "ความชื้น",
-    adj_temp: "อุณหภูมิ",
-    adj_sand: "ประเภททราย",
-  },
-  tl: {
-    title: "MixRight",
-    tagline: "Tamang halo ng kongkreto para sa panahon ngayon",
-    getting_weather: "Binabasa ang panahon...",
-    weather_error: "Hindi makuha ang panahon — ipasok nang manu-mano",
-    temp: "Temp",
-    humidity: "Halumigmig",
-    mix_class: "Klase ng Mix",
-    application: "Uri ng Trabaho",
-    sand_type: "Uri ng Buhangin",
-    sand_river: "Buhangin sa ilog (makinis)",
-    sand_crushed: "Dinurog na bato (magaspang)",
-    sand_mixed: "Halo / hindi sigurado",
-    cement_age: "Edad ng semento",
-    fresh: "Bago (≤1 buwan)",
-    one_month: "1–3 buwan",
-    three_months: "3–6 buwan",
-    old: "6+ buwan",
-    num_bags: "Bilang ng bag",
-    calculate: "Kalkulahin ang Halo",
-    water_per_bag: "Tubig bawat bag",
-    total_water: "Kabuuang tubig",
-    liters: "L",
-    buckets_per_bag: "Timba bawat bag (20L timba)",
-    cement_b: "Semento",
-    sand_b: "Buhangin",
-    gravel_b: "Graba",
-    one_bag: "1 bag",
-    cure_title: "Pagpapatuyo",
-    cure_days: "Panatilihing basa sa loob ng",
-    days: "araw",
-    recalculate: "Kalkulahin Muli",
-    why_adj: "Bakit naaayos?",
-    adj_humidity: "Halumigmig",
-    adj_temp: "Temperatura",
-    adj_sand: "Uri ng buhangin",
-  },
-  id: {
-    title: "MixRight",
-    tagline: "Campuran beton untuk cuaca hari ini",
-    getting_weather: "Membaca cuaca...",
-    weather_error: "Tidak bisa ambil cuaca — masukkan manual",
-    temp: "Suhu",
-    humidity: "Kelembapan",
-    mix_class: "Kelas Beton",
-    application: "Jenis Pekerjaan",
-    sand_type: "Jenis Pasir",
-    sand_river: "Pasir sungai (halus)",
-    sand_crushed: "Pasir abu batu (kasar)",
-    sand_mixed: "Campuran / tidak yakin",
-    cement_age: "Usia semen",
-    fresh: "Baru (≤1 bulan)",
-    one_month: "1–3 bulan",
-    three_months: "3–6 bulan",
-    old: "6+ bulan",
-    num_bags: "Jumlah sak",
-    calculate: "Hitung Campuran",
-    water_per_bag: "Air per sak",
-    total_water: "Total air",
-    liters: "L",
-    buckets_per_bag: "Ember per sak (ember 20L)",
-    cement_b: "Semen",
-    sand_b: "Pasir",
-    gravel_b: "Kerikil",
-    one_bag: "1 sak",
-    cure_title: "Perawatan",
-    cure_days: "Jaga tetap lembab selama",
-    days: "hari",
-    recalculate: "Hitung Ulang",
-    why_adj: "Mengapa disesuaikan?",
-    adj_humidity: "Kelembapan",
-    adj_temp: "Suhu",
-    adj_sand: "Jenis pasir",
-  },
-};
+import { fetchWeather, type CurrentWeather, type ForecastDay } from "@/lib/weatherApi";
+import { calculateMultiMix, type SelectedApp, type MultiMixResult } from "@/lib/mixCalculator";
+import type { MixClassKey } from "@/lib/constants";
+
+type Tab = "location" | "mix" | "plan" | "results";
+
+// Default to Bangkok if no GPS
+const DEFAULT_LAT = 13.7563;
+const DEFAULT_LNG = 100.5018;
 
 export default function Home() {
-  const [lang, setLang] = useState<Lang>("en");
-  const [step, setStep] = useState<Step>("inputs");
-  const [weather, setWeather] = useState<WeatherData | null>(null);
-  const [weatherLoading, setWeatherLoading] = useState(true);
-  const [weatherErrorMsg, setWeatherErrorMsg] = useState<string | null>(null);
-  const [manualTemp, setManualTemp] = useState(32);
-  const [manualHumidity, setManualHumidity] = useState(80);
-  const [mixClass, setMixClass] = useState<MixClass>("B");
-  const [applicationId, setApplicationId] = useState("slab");
-  const [sandType, setSandType] = useState<SandType>("river");
+  // Location
+  const [lat, setLat] = useState(DEFAULT_LAT);
+  const [lng, setLng] = useState(DEFAULT_LNG);
+  const [locationSet, setLocationSet] = useState(false);
+  const [weatherLoading, setWeatherLoading] = useState(false);
+  const [weatherError, setWeatherError] = useState<string | null>(null);
+  const [currentWeather, setCurrentWeather] = useState<CurrentWeather | null>(null);
+  const [forecast, setForecast] = useState<ForecastDay[]>([]);
+
+  // Mix inputs
+  const [projectRef, setProjectRef] = useState("");
+  const [mixClass, setMixClass] = useState<MixClassKey>("general");
+  const [selectedApps, setSelectedApps] = useState<SelectedApp[]>([
+    { applicationId: "slab", numBags: 2 },
+  ]);
+  const [sandType, setSandType] = useState<"river" | "crushed" | "mixed">("river");
   const [cementAge, setCementAge] = useState(0);
-  const [numBags, setNumBags] = useState(2);
-  const [result, setResult] = useState<MixResult | null>(null);
 
-  const t = T[lang];
+  // Plan
+  const [pourDate, setPourDate] = useState<string | null>(null);
 
-  useEffect(() => {
-    getCurrentWeather().then((res) => {
-      setWeatherLoading(false);
-      if (isWeatherError(res)) {
-        setWeatherErrorMsg(res.message);
-      } else {
-        setWeather(res);
-      }
-    });
-  }, []);
+  // Results
+  const [result, setResult] = useState<MultiMixResult | null>(null);
 
-  const activeTemp = weather?.temperatureC ?? manualTemp;
-  const activeHumidity = weather?.humidityPct ?? manualHumidity;
+  // Nav
+  const [tab, setTab] = useState<Tab>("location");
 
-  function handleCalculate() {
-    const inputs: MixInputs = {
-      mixClass,
-      applicationId,
-      sandType,
-      cementAgeMonths: cementAge,
-      temperatureC: activeTemp,
-      humidityPct: activeHumidity,
-      numBags,
-    };
-    setResult(calculateMix(inputs));
-    setStep("results");
+  async function handleLocationConfirm(newLat: number, newLng: number) {
+    setLat(newLat);
+    setLng(newLng);
+    setWeatherLoading(true);
+    setWeatherError(null);
+    try {
+      const data = await fetchWeather(newLat, newLng);
+      setCurrentWeather(data.current);
+      setForecast(data.forecast);
+      setLocationSet(true);
+      // Auto-set pour date to today if not set
+      if (!pourDate && data.forecast.length > 0) setPourDate(data.forecast[0].date);
+    } catch {
+      setWeatherError("Could not fetch weather. Check connection and try again.");
+    }
+    setWeatherLoading(false);
   }
 
-  const LANGS: { code: Lang; label: string }[] = [
-    { code: "en", label: "EN" },
-    { code: "th", label: "TH" },
-    { code: "tl", label: "TL" },
-    { code: "id", label: "ID" },
+  function handleCalculate() {
+    if (!currentWeather || selectedApps.length === 0) return;
+    const r = calculateMultiMix(
+      selectedApps,
+      sandType,
+      cementAge,
+      currentWeather.temperatureC,
+      currentWeather.humidityPct,
+    );
+    setResult(r);
+    setTab("results");
+  }
+
+  const hasApps = selectedApps.length > 0;
+  const canCalculate = locationSet && hasApps;
+
+  // Primary application for lifecycle (use most structurally demanding)
+  const primaryApp = selectedApps.length > 0
+    ? selectedApps.find(a => ["footing", "column", "stairs"].includes(a.applicationId)) ?? selectedApps[0]
+    : null;
+  const isPrimaryStructural = primaryApp
+    ? ["footing", "column", "stairs"].includes(primaryApp.applicationId)
+    : false;
+
+  const pourDateObj = pourDate ? new Date(pourDate + "T07:00:00") : null;
+
+  const TABS: { id: Tab; label: string; Icon: React.ComponentType<{ className?: string }> }[] = [
+    { id: "location", label: "Location",  Icon: MapPin },
+    { id: "mix",      label: "Mix",       Icon: FlaskConical },
+    { id: "plan",     label: "Plan",      Icon: CalendarDays },
+    { id: "results",  label: "Results",   Icon: result ? ClipboardList : Lock },
   ];
 
   return (
-    <main className="min-h-screen bg-background text-foreground">
+    <main className="min-h-screen bg-background text-foreground flex flex-col">
       {/* Header */}
-      <header className="bg-primary text-primary-foreground px-4 py-4 flex items-center justify-between sticky top-0 z-10 shadow-md">
-        <div>
-          <h1 className="text-2xl font-black tracking-tight">{t.title}</h1>
-          <p className="text-xs opacity-80 mt-0.5">{t.tagline}</p>
-        </div>
-        <div className="flex gap-1">
-          {LANGS.map((l) => (
-            <button
-              key={l.code}
-              onClick={() => setLang(l.code)}
-              className={`px-2 py-1 text-xs font-bold rounded transition-all ${
-                lang === l.code
-                  ? "bg-primary-foreground text-primary"
-                  : "opacity-60 hover:opacity-90"
-              }`}
-            >
-              {l.label}
-            </button>
-          ))}
+      <header className="bg-gradient-to-r from-primary to-orange-600 text-primary-foreground px-4 pt-6 pb-4 shadow-lg">
+        <div className="max-w-md mx-auto">
+          <div className="flex items-baseline gap-2">
+            <h1 className="text-3xl font-black tracking-tight">MixRight</h1>
+            <span className="text-sm opacity-75 font-medium">concrete calculator</span>
+          </div>
+          {projectRef && (
+            <div className="mt-1 text-xs opacity-80 font-medium truncate">{projectRef}</div>
+          )}
+          {currentWeather && (
+            <div className="flex items-center gap-3 mt-2 text-sm opacity-90">
+              <span className="font-bold">{currentWeather.temperatureC}°C</span>
+              <span>{currentWeather.humidityPct}% humidity</span>
+              <span className="text-xs opacity-70">{lat.toFixed(2)}°, {lng.toFixed(2)}°</span>
+            </div>
+          )}
         </div>
       </header>
 
-      <div className="max-w-md mx-auto px-4 py-6 space-y-4">
-        {/* Weather Card */}
-        <Card className="border-2 border-primary/20">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-              {t.temp} / {t.humidity}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {weatherLoading ? (
-              <p className="text-sm text-muted-foreground animate-pulse">{t.getting_weather}</p>
-            ) : weather ? (
-              <div className="flex items-center gap-4">
-                <div className="text-center">
-                  <div className="text-3xl font-black text-primary">{weather.temperatureC}°C</div>
-                  <div className="text-xs text-muted-foreground">{t.temp}</div>
-                </div>
-                <div className="text-3xl text-muted-foreground font-light">|</div>
-                <div className="text-center">
-                  <div className="text-3xl font-black text-primary">{weather.humidityPct}%</div>
-                  <div className="text-xs text-muted-foreground">{t.humidity}</div>
-                </div>
-                <Badge variant="secondary" className="ml-auto text-xs">GPS</Badge>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                <p className="text-xs text-muted-foreground">{weatherErrorMsg || t.weather_error}</p>
-                <div className="flex gap-4">
-                  <div className="flex-1">
-                    <label className="text-xs text-muted-foreground block mb-1">{t.temp} (°C)</label>
-                    <input
-                      type="number"
-                      value={manualTemp}
-                      onChange={(e) => setManualTemp(Number(e.target.value))}
-                      className="w-full border border-input rounded-md px-3 py-2 text-lg font-bold text-center bg-background"
-                      min={15} max={50}
-                    />
-                  </div>
-                  <div className="flex-1">
-                    <label className="text-xs text-muted-foreground block mb-1">{t.humidity} (%)</label>
-                    <input
-                      type="number"
-                      value={manualHumidity}
-                      onChange={(e) => setManualHumidity(Number(e.target.value))}
-                      className="w-full border border-input rounded-md px-3 py-2 text-lg font-bold text-center bg-background"
-                      min={20} max={100}
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+      {/* Tab content */}
+      <div className="flex-1 overflow-y-auto">
+        <div className="max-w-md mx-auto px-4 py-5 space-y-4">
 
-        {step === "inputs" && (
-          <>
-            {/* Mix Class */}
-            <Card>
-              <CardContent className="pt-4 pb-4">
-                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">{t.mix_class}</p>
-                <div className="grid grid-cols-3 gap-2">
-                  {(["A", "B", "C"] as MixClass[]).map((c) => (
+          {/* LOCATION TAB */}
+          {tab === "location" && (
+            <>
+              <div className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Construction site location</div>
+
+              <LocationPicker
+                lat={lat} lng={lng}
+                onConfirm={handleLocationConfirm}
+                loading={weatherLoading}
+              />
+
+              {weatherError && (
+                <div className="bg-destructive/10 border border-destructive/20 rounded-lg px-3 py-2 text-sm text-destructive">
+                  {weatherError}
+                </div>
+              )}
+
+              {currentWeather && (
+                <>
+                  <Separator />
+                  <WeatherDashboard
+                    lat={lat} lng={lng}
+                    weather={currentWeather}
+                    todayForecast={forecast[0]}
+                  />
+                  <Button className="w-full" onClick={() => setTab("mix")}>
+                    Set up your mix →
+                  </Button>
+                </>
+              )}
+            </>
+          )}
+
+          {/* MIX TAB */}
+          {tab === "mix" && (
+            <>
+              {/* Project reference */}
+              <div>
+                <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground block mb-2">
+                  Project reference (optional)
+                </label>
+                <input
+                  type="text"
+                  value={projectRef}
+                  onChange={e => setProjectRef(e.target.value)}
+                  placeholder="e.g. Block A – Column F3, or engineer spec no."
+                  className="w-full border border-input rounded-xl px-3 py-2.5 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
+                />
+              </div>
+
+              <Separator />
+
+              {/* Mix class */}
+              <div>
+                <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">
+                  Concrete strength
+                </div>
+                <MixClassSelector value={mixClass} onChange={setMixClass} />
+                <p className="text-xs text-muted-foreground mt-2">
+                  The mix class is auto-suggested per application below, but this sets the default.
+                </p>
+              </div>
+
+              <Separator />
+
+              {/* Applications */}
+              <div>
+                <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">
+                  What are you pouring? (select all that apply)
+                </div>
+                <ApplicationSelector selected={selectedApps} onChange={setSelectedApps} />
+              </div>
+
+              <Separator />
+
+              {/* Sand type */}
+              <div>
+                <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">Sand type</div>
+                <div className="space-y-2">
+                  {[
+                    { v: "river",   label: "River sand", desc: "Smooth, rounded grains — most common in SEA rivers" },
+                    { v: "crushed", label: "Crushed rock / pasir abu", desc: "Sharp, angular grains — slightly more water needed" },
+                    { v: "mixed",   label: "Mixed / not sure", desc: "Middle estimate used" },
+                  ].map(s => (
                     <button
-                      key={c}
-                      onClick={() => setMixClass(c)}
-                      className={`py-3 px-2 rounded-lg font-bold text-sm border-2 transition-all ${
-                        mixClass === c
-                          ? "bg-primary text-primary-foreground border-primary"
-                          : "border-border text-muted-foreground hover:border-primary/50"
+                      key={s.v}
+                      onClick={() => setSandType(s.v as "river" | "crushed" | "mixed")}
+                      className={`w-full text-left px-4 py-2.5 rounded-xl border-2 transition-all ${
+                        sandType === s.v
+                          ? "border-primary bg-primary/5"
+                          : "border-border hover:border-muted-foreground/30"
                       }`}
                     >
-                      {c}
+                      <div className="font-semibold text-sm">{s.label}</div>
+                      <div className="text-xs text-muted-foreground">{s.desc}</div>
                     </button>
                   ))}
                 </div>
-                <p className="text-xs text-muted-foreground mt-2">
-                  {lang === "en" && mixClass === "A" && "1:1.5:3 — Columns, footings, beams"}
-                  {lang === "en" && mixClass === "B" && "1:2:4 — Slabs, walls, general"}
-                  {lang === "en" && mixClass === "C" && "1:3:6 — Fence posts, non-structural"}
-                  {lang !== "en" && `Class ${mixClass}`}
-                </p>
-              </CardContent>
-            </Card>
+              </div>
 
-            {/* Application */}
-            <Card>
-              <CardContent className="pt-4 pb-4">
-                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">{t.application}</p>
-                <div className="grid grid-cols-2 gap-2">
-                  {APPLICATION_TYPES.map((app) => {
-                    const label = lang === "id" ? app.id_text : (app[lang as "en" | "th" | "tl"] ?? app.en);
-                    return (
-                      <button
-                        key={app.id}
-                        onClick={() => setApplicationId(app.id)}
-                        className={`py-2 px-3 rounded-lg text-sm text-left border-2 transition-all ${
-                          applicationId === app.id
-                            ? "bg-primary/10 border-primary text-primary font-semibold"
-                            : "border-border text-muted-foreground hover:border-primary/40"
-                        }`}
-                      >
-                        {label}
-                      </button>
-                    );
-                  })}
-                </div>
-              </CardContent>
-            </Card>
+              <Separator />
 
-            {/* Sand + Cement Age + Bags */}
-            <Card>
-              <CardContent className="pt-4 pb-4 space-y-4">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">{t.sand_type}</p>
-                  <div className="space-y-2">
-                    {(["river", "crushed", "mixed"] as SandType[]).map((s) => (
-                      <button
-                        key={s}
-                        onClick={() => setSandType(s)}
-                        className={`w-full py-2 px-4 rounded-lg text-sm text-left border-2 transition-all ${
-                          sandType === s
-                            ? "bg-primary/10 border-primary text-primary font-semibold"
-                            : "border-border text-muted-foreground hover:border-primary/40"
-                        }`}
-                      >
-                        {s === "river" ? t.sand_river : s === "crushed" ? t.sand_crushed : t.sand_mixed}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <Separator />
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">{t.cement_age}</p>
-                  <div className="space-y-2">
-                    {[
-                      { months: 0, label: t.fresh },
-                      { months: 2, label: t.one_month },
-                      { months: 4, label: t.three_months },
-                      { months: 8, label: t.old },
-                    ].map(({ months, label }) => (
-                      <button
-                        key={months}
-                        onClick={() => setCementAge(months)}
-                        className={`w-full py-2 px-4 rounded-lg text-sm text-left border-2 transition-all ${
-                          cementAge === months
-                            ? "bg-primary/10 border-primary text-primary font-semibold"
-                            : "border-border text-muted-foreground hover:border-primary/40"
-                        }`}
-                      >
-                        {label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <Separator />
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">{t.num_bags}</p>
-                  <div className="flex items-center gap-3">
+              {/* Cement age */}
+              <div>
+                <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">Cement bag age</div>
+                <div className="space-y-2">
+                  {[
+                    { v: 0, label: "Fresh (≤1 month)",        desc: "Full strength expected" },
+                    { v: 2, label: "1–3 months",              desc: "OK — check for lumps before mixing" },
+                    { v: 4, label: "3–6 months",              desc: "10–20% strength loss — avoid structural use" },
+                    { v: 8, label: "6+ months (degraded)",    desc: "Do not use for columns, footings, or beams" },
+                  ].map(a => (
                     <button
-                      onClick={() => setNumBags(Math.max(1, numBags - 1))}
-                      className="w-12 h-12 rounded-lg border-2 border-border text-xl font-bold hover:border-primary transition-colors"
-                    >−</button>
-                    <span className="text-3xl font-black text-primary flex-1 text-center">{numBags}</span>
-                    <button
-                      onClick={() => setNumBags(Math.min(50, numBags + 1))}
-                      className="w-12 h-12 rounded-lg border-2 border-border text-xl font-bold hover:border-primary transition-colors"
-                    >+</button>
-                  </div>
+                      key={a.v}
+                      onClick={() => setCementAge(a.v)}
+                      className={`w-full text-left px-4 py-2.5 rounded-xl border-2 transition-all ${
+                        cementAge === a.v
+                          ? "border-primary bg-primary/5"
+                          : "border-border hover:border-muted-foreground/30"
+                      }`}
+                    >
+                      <div className="font-semibold text-sm">{a.label}</div>
+                      <div className="text-xs text-muted-foreground">{a.desc}</div>
+                    </button>
+                  ))}
                 </div>
-              </CardContent>
-            </Card>
+              </div>
 
-            <Button onClick={handleCalculate} className="w-full h-14 text-lg font-black" size="lg">
-              {t.calculate}
-            </Button>
-          </>
-        )}
+              <Button
+                className="w-full h-14 text-base font-black"
+                onClick={handleCalculate}
+                disabled={!canCalculate}
+              >
+                {!locationSet ? "Set location first" : !hasApps ? "Select at least one application" : "Calculate Mix"}
+              </Button>
+            </>
+          )}
 
-        {/* Results */}
-        {step === "results" && result && (
-          <>
-            {result.cementWarning.level !== "ok" && (
-              <Card className={`border-2 ${result.cementWarning.level === "danger" ? "border-destructive bg-destructive/5" : "border-yellow-500 bg-yellow-50"}`}>
-                <CardContent className="pt-4 pb-4">
-                  <p className={`text-sm font-semibold ${result.cementWarning.level === "danger" ? "text-destructive" : "text-yellow-700"}`}>
-                    ⚠ {(result.cementWarning as Record<string, string>)[lang]}
-                  </p>
-                </CardContent>
-              </Card>
-            )}
-
-            <Card className="border-2 border-primary">
-              <CardContent className="pt-6 pb-6 text-center">
-                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{t.water_per_bag}</p>
-                <div className="text-6xl font-black text-primary mt-1">{result.waterPerBag}</div>
-                <div className="text-2xl font-semibold text-muted-foreground">{t.liters}</div>
-                {numBags > 1 && (
-                  <p className="text-sm text-muted-foreground mt-2">
-                    {t.total_water}: <strong>{result.totalWater}{t.liters}</strong>
-                  </p>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="pt-4 pb-4">
-                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-4">{t.buckets_per_bag}</p>
-                <div className="grid grid-cols-3 gap-3 text-center">
-                  <div className="bg-muted rounded-lg py-3">
-                    <div className="text-xl font-black">{t.one_bag}</div>
-                    <div className="text-xs text-muted-foreground mt-1">{t.cement_b}</div>
-                  </div>
-                  <div className="bg-muted rounded-lg py-3">
-                    <div className="text-xl font-black">{result.bucketsPerBag.sand}×</div>
-                    <div className="text-xs text-muted-foreground mt-1">{t.sand_b}</div>
-                  </div>
-                  <div className="bg-muted rounded-lg py-3">
-                    <div className="text-xl font-black">{result.bucketsPerBag.gravel}×</div>
-                    <div className="text-xs text-muted-foreground mt-1">{t.gravel_b}</div>
-                  </div>
+          {/* PLAN TAB */}
+          {tab === "plan" && (
+            <>
+              {forecast.length === 0 ? (
+                <div className="text-center py-10 space-y-3">
+                  <div className="text-4xl">📍</div>
+                  <p className="text-muted-foreground text-sm">Set your location first to see the 7-day forecast.</p>
+                  <Button variant="outline" onClick={() => setTab("location")}>Go to Location</Button>
                 </div>
-              </CardContent>
-            </Card>
+              ) : (
+                <>
+                  <div className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">7-day pour planner</div>
+                  <ForecastCalendar forecast={forecast} selectedDate={pourDate} onSelect={setPourDate} />
 
-            {(result.adjustments.humidity !== 0 || result.adjustments.temperature !== 0) && (
-              <Card className="bg-muted/50">
-                <CardContent className="pt-4 pb-4">
-                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">{t.why_adj}</p>
-                  <div className="space-y-1 text-sm">
-                    {result.adjustments.humidity !== 0 && (
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">{t.adj_humidity} ({activeHumidity}%)</span>
-                        <span className={`font-semibold ${result.adjustments.humidity < 0 ? "text-blue-600" : "text-orange-600"}`}>
-                          {result.adjustments.humidity > 0 ? "+" : ""}{result.adjustments.humidity}L
-                        </span>
+                  {pourDate && pourDateObj && currentWeather && (
+                    <>
+                      <Separator />
+                      <div className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                        Concrete lifecycle — {pourDate}
                       </div>
-                    )}
-                    {result.adjustments.temperature !== 0 && (
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">{t.adj_temp} ({activeTemp}°C)</span>
-                        <span className={`font-semibold ${result.adjustments.temperature < 0 ? "text-blue-600" : "text-orange-600"}`}>
-                          {result.adjustments.temperature > 0 ? "+" : ""}{result.adjustments.temperature}L
-                        </span>
+                      <LifecycleTimeline
+                        pourDate={pourDateObj}
+                        tempC={currentWeather.temperatureC}
+                        humidity={currentWeather.humidityPct}
+                        isStructural={isPrimaryStructural}
+                      />
+                    </>
+                  )}
+                </>
+              )}
+            </>
+          )}
+
+          {/* RESULTS TAB */}
+          {tab === "results" && (
+            <>
+              {!result ? (
+                <div className="text-center py-10 space-y-3">
+                  <div className="text-4xl">🧮</div>
+                  <p className="text-muted-foreground text-sm">Complete the Mix tab and calculate to see results.</p>
+                  <Button variant="outline" onClick={() => setTab("mix")}>Go to Mix</Button>
+                </div>
+              ) : (
+                <>
+                  <ResultsDashboard result={result} projectRef={projectRef} />
+
+                  {pourDate && pourDateObj && currentWeather && (
+                    <>
+                      <Separator />
+                      <div className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                        Concrete lifecycle from pour date
                       </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
+                      <LifecycleTimeline
+                        pourDate={pourDateObj}
+                        tempC={currentWeather.temperatureC}
+                        humidity={currentWeather.humidityPct}
+                        isStructural={isPrimaryStructural}
+                      />
+                    </>
+                  )}
 
-            <Card className="border-primary/30">
-              <CardContent className="pt-4 pb-4">
-                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">{t.cure_title}</p>
-                <p className="text-2xl font-black text-primary">
-                  {t.cure_days} {result.cureTime.minDays} {t.days}
-                </p>
-                <p className="text-sm text-muted-foreground mt-2">
-                  {(result.cureTime.note as Record<string, string>)[lang]}
-                </p>
-              </CardContent>
-            </Card>
-
-            <Button
-              onClick={() => { setStep("inputs"); setResult(null); }}
-              variant="outline"
-              className="w-full h-12 font-semibold"
-            >
-              {t.recalculate}
-            </Button>
-          </>
-        )}
+                  <Button variant="outline" className="w-full" onClick={() => { setResult(null); setTab("mix"); }}>
+                    Recalculate
+                  </Button>
+                </>
+              )}
+            </>
+          )}
+        </div>
       </div>
+
+      {/* Bottom nav */}
+      <nav className="sticky bottom-0 bg-background border-t border-border shadow-[0_-4px_20px_rgba(0,0,0,0.08)] px-2 py-2 z-20">
+        <div className="max-w-md mx-auto grid grid-cols-4 gap-1">
+          {TABS.map(({ id, label, Icon }) => {
+            const isActive   = tab === id;
+            const isDisabled = id === "results" && !result;
+            return (
+              <button
+                key={id}
+                onClick={() => !isDisabled && setTab(id)}
+                disabled={isDisabled}
+                className={`flex flex-col items-center gap-0.5 py-2 px-1 rounded-xl transition-all ${
+                  isActive   ? "bg-primary/10 text-primary"
+                  : isDisabled ? "opacity-30 cursor-not-allowed text-muted-foreground"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                }`}
+              >
+                <Icon className={`w-5 h-5 ${isActive ? "text-primary" : ""}`} />
+                <span className={`text-[10px] font-semibold ${isActive ? "text-primary" : ""}`}>{label}</span>
+              </button>
+            );
+          })}
+        </div>
+      </nav>
     </main>
   );
 }

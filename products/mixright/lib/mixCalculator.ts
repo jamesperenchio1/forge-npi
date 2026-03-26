@@ -1,6 +1,7 @@
 import {
-  MIX_CLASS_BASE_WCR,
-  MIX_PROPORTIONS,
+  MIX_CLASSES,
+  MixClassKey,
+  APPLICATION_TYPES,
   SAND_ADJUSTMENTS,
   getHumidityWaterAdj,
   getTempWaterAdj,
@@ -8,93 +9,87 @@ import {
   getCureTime,
 } from "./constants";
 
-export interface MixInputs {
-  mixClass: "A" | "B" | "C";
+export interface SelectedApp {
   applicationId: string;
-  sandType: "river" | "crushed" | "mixed";
-  cementAgeMonths: number;
-  temperatureC: number;
-  humidityPct: number;
-  numBags: number; // how many 50kg bags they're mixing
+  numBags: number;
+  mixClassOverride?: MixClassKey; // if user wants to override the recommendation
 }
 
-export interface MixResult {
-  waterPerBag: number;       // liters of water to add per 50kg bag
-  totalWater: number;        // total liters for all bags
-  bucketsPerBag: {
-    cement: number;
-    sand: number;
-    gravel: number;
-  };
-  totalBuckets: {
-    cement: number;
-    sand: number;
-    gravel: number;
-  };
-  wcr: number;               // final water-cement ratio used
+export interface AppMixResult {
+  applicationId: string;
+  applicationLabel: string;
+  numBags: number;
+  mixClass: MixClassKey;
+  waterPerBag: number;     // L
+  totalWater: number;      // L
+  buckets: { sand: number; gravel: number };
+  totalBuckets: { sand: number; gravel: number };
   cureTime: ReturnType<typeof getCureTime>;
-  cementWarning: ReturnType<typeof getCementAgeWarning>;
-  adjustments: {
-    humidity: number;
-    temperature: number;
-    sandType: number;
-  };
 }
 
-// Standard 20L builder's bucket — common in SEA
-const BUCKET_VOLUME_L = 20;
-// 1 bag cement (50kg) ≈ 33.3L loose volume
-const CEMENT_BAG_VOLUME_L = 33.3;
-
-export function calculateMix(inputs: MixInputs): MixResult {
-  const { mixClass, applicationId, sandType, cementAgeMonths, temperatureC, humidityPct, numBags } = inputs;
-
-  // Base water-cement ratio
-  const baseWcr = MIX_CLASS_BASE_WCR[mixClass];
-
-  // Water adjustments (in liters per 50kg bag)
-  const humidityAdj = getHumidityWaterAdj(humidityPct);
-  const tempAdj = getTempWaterAdj(temperatureC);
-  const sandWcrAdj = SAND_ADJUSTMENTS[sandType];
-
-  // Final WCR (sand type adjusts the ratio, humidity/temp adjust absolute water amount)
-  const finalWcr = baseWcr + sandWcrAdj;
-
-  // Base water per 50kg bag (50kg * wcr = kg water, 1kg water ≈ 1L)
-  const baseWaterPerBag = 50 * finalWcr;
-
-  // Adjusted water per bag (humidity and temp shift absolute water by small amounts)
-  const waterPerBag = Math.max(10, Math.round((baseWaterPerBag + humidityAdj + tempAdj) * 10) / 10);
-
-  // Mix proportions (1 bag cement = 1 unit volume = CEMENT_BAG_VOLUME_L)
-  const props = MIX_PROPORTIONS[mixClass];
-  const sandVolume = props.sand * CEMENT_BAG_VOLUME_L;
-  const gravelVolume = props.gravel * CEMENT_BAG_VOLUME_L;
-
-  const bucketsPerBag = {
-    cement: 1.67, // 1 bag = 33.3L ≈ 1.67 × 20L buckets (just tell them "1 bag")
-    sand: Math.round((sandVolume / BUCKET_VOLUME_L) * 10) / 10,
-    gravel: Math.round((gravelVolume / BUCKET_VOLUME_L) * 10) / 10,
+export interface MultiMixResult {
+  perApp: AppMixResult[];
+  totals: {
+    totalBags: number;
+    totalWater: number;
+    totalSandBuckets: number;
+    totalGravelBuckets: number;
   };
+  cementWarning: ReturnType<typeof getCementAgeWarning>;
+  adjustments: { humidity: number; temperature: number };
+}
 
-  const totalBuckets = {
-    cement: Math.round(bucketsPerBag.cement * numBags * 10) / 10,
-    sand: Math.round(bucketsPerBag.sand * numBags * 10) / 10,
-    gravel: Math.round(bucketsPerBag.gravel * numBags * 10) / 10,
-  };
+const BUCKET_L = 20;          // standard 20L builder bucket
+const CEMENT_BAG_L = 33.3;    // 50kg cement bag ≈ 33.3L loose volume
+
+export function calculateMultiMix(
+  selectedApps: SelectedApp[],
+  sandType: "river" | "crushed" | "mixed",
+  cementAgeMonths: number,
+  temperatureC: number,
+  humidityPct: number
+): MultiMixResult {
+  const humidityAdj  = getHumidityWaterAdj(humidityPct);
+  const tempAdj      = getTempWaterAdj(temperatureC);
+  const sandWcrAdj   = SAND_ADJUSTMENTS[sandType];
+
+  const perApp: AppMixResult[] = selectedApps.map(sel => {
+    const appType    = APPLICATION_TYPES.find(a => a.id === sel.applicationId)!;
+    const mixKey     = sel.mixClassOverride ?? appType.recommended;
+    const mixClass   = MIX_CLASSES[mixKey];
+
+    const finalWcr   = mixClass.wcr + sandWcrAdj;
+    const baseWater  = 50 * finalWcr;
+    const waterPerBag = Math.max(10, Math.round((baseWater + humidityAdj + tempAdj) * 10) / 10);
+
+    const sandPerBag   = Math.round((mixClass.proportions.sand   * CEMENT_BAG_L / BUCKET_L) * 10) / 10;
+    const gravelPerBag = Math.round((mixClass.proportions.gravel * CEMENT_BAG_L / BUCKET_L) * 10) / 10;
+
+    return {
+      applicationId:    sel.applicationId,
+      applicationLabel: appType.label,
+      numBags:          sel.numBags,
+      mixClass:         mixKey,
+      waterPerBag,
+      totalWater:       Math.round(waterPerBag * sel.numBags * 10) / 10,
+      buckets: { sand: sandPerBag, gravel: gravelPerBag },
+      totalBuckets: {
+        sand:   Math.round(sandPerBag   * sel.numBags * 10) / 10,
+        gravel: Math.round(gravelPerBag * sel.numBags * 10) / 10,
+      },
+      cureTime: getCureTime(humidityPct, appType.isStructural),
+    };
+  });
+
+  const totalBags         = perApp.reduce((s, a) => s + a.numBags, 0);
+  const totalWater        = Math.round(perApp.reduce((s, a) => s + a.totalWater, 0) * 10) / 10;
+  const totalSandBuckets  = Math.round(perApp.reduce((s, a) => s + a.totalBuckets.sand,   0) * 10) / 10;
+  const totalGravelBuckets = Math.round(perApp.reduce((s, a) => s + a.totalBuckets.gravel, 0) * 10) / 10;
 
   return {
-    waterPerBag,
-    totalWater: Math.round(waterPerBag * numBags * 10) / 10,
-    bucketsPerBag,
-    totalBuckets,
-    wcr: Math.round(finalWcr * 100) / 100,
-    cureTime: getCureTime(humidityPct, applicationId),
+    perApp,
+    totals: { totalBags, totalWater, totalSandBuckets, totalGravelBuckets },
     cementWarning: getCementAgeWarning(cementAgeMonths),
-    adjustments: {
-      humidity: humidityAdj,
-      temperature: tempAdj,
-      sandType: sandWcrAdj,
-    },
+    adjustments: { humidity: humidityAdj, temperature: tempAdj },
   };
 }

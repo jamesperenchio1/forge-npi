@@ -1,59 +1,65 @@
-export interface WeatherData {
+export interface CurrentWeather {
   temperatureC: number;
   humidityPct: number;
-  locationLabel: string;
+  windSpeedKph: number;
+  uvIndex: number;
 }
 
-export interface WeatherError {
-  type: "permission_denied" | "position_unavailable" | "fetch_failed";
-  message: string;
+export interface ForecastDay {
+  date: string;           // "YYYY-MM-DD"
+  maxTempC: number;
+  minTempC: number;
+  maxHumidity: number;
+  precipMm: number;
+  weatherCode: number;
+  windSpeedMax: number;
+  uvIndexMax: number;
 }
 
-export async function getCurrentWeather(): Promise<WeatherData | WeatherError> {
-  // Step 1: Get GPS coords
-  let coords: GeolocationCoordinates;
-  try {
-    const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-      navigator.geolocation.getCurrentPosition(resolve, reject, {
-        enableHighAccuracy: false,
-        timeout: 8000,
-        maximumAge: 300000, // Cache position for 5 min
-      });
-    });
-    coords = position.coords;
-  } catch (err: unknown) {
-    const error = err as GeolocationPositionError;
-    if (error.code === 1) {
-      return { type: "permission_denied", message: "Location permission denied. Enter weather manually." };
-    }
-    return { type: "position_unavailable", message: "Could not get location. Enter weather manually." };
-  }
-
-  // Step 2: Fetch from Open-Meteo (free, no API key)
-  try {
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${coords.latitude.toFixed(4)}&longitude=${coords.longitude.toFixed(4)}&current=temperature_2m,relative_humidity_2m&forecast_days=1`;
-    const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
-
-    if (!res.ok) throw new Error(`Open-Meteo returned ${res.status}`);
-
-    const data = await res.json();
-    const temp = data.current?.temperature_2m;
-    const humidity = data.current?.relative_humidity_2m;
-
-    if (typeof temp !== "number" || typeof humidity !== "number") {
-      throw new Error("Unexpected response format from Open-Meteo");
-    }
-
-    return {
-      temperatureC: Math.round(temp * 10) / 10,
-      humidityPct: Math.round(humidity),
-      locationLabel: `${coords.latitude.toFixed(2)}°, ${coords.longitude.toFixed(2)}°`,
-    };
-  } catch {
-    return { type: "fetch_failed", message: "Could not fetch weather. Check connection or enter manually." };
-  }
+export interface WeatherResponse {
+  current: CurrentWeather;
+  forecast: ForecastDay[];
 }
 
-export function isWeatherError(result: WeatherData | WeatherError): result is WeatherError {
-  return "type" in result;
+export async function fetchWeather(lat: number, lng: number): Promise<WeatherResponse> {
+  const url = new URL("https://api.open-meteo.com/v1/forecast");
+  url.searchParams.set("latitude", lat.toFixed(4));
+  url.searchParams.set("longitude", lng.toFixed(4));
+  url.searchParams.set("current", "temperature_2m,relative_humidity_2m,wind_speed_10m,uv_index");
+  url.searchParams.set("daily", [
+    "temperature_2m_max",
+    "temperature_2m_min",
+    "relative_humidity_2m_max",
+    "precipitation_sum",
+    "weathercode",
+    "wind_speed_10m_max",
+    "uv_index_max",
+  ].join(","));
+  url.searchParams.set("timezone", "auto");
+  url.searchParams.set("forecast_days", "7");
+
+  const res = await fetch(url.toString(), { signal: AbortSignal.timeout(10000) });
+  if (!res.ok) throw new Error(`Open-Meteo error: ${res.status}`);
+
+  const data = await res.json();
+
+  const current: CurrentWeather = {
+    temperatureC: Math.round(data.current.temperature_2m * 10) / 10,
+    humidityPct:  Math.round(data.current.relative_humidity_2m),
+    windSpeedKph: Math.round(data.current.wind_speed_10m),
+    uvIndex:      Math.round(data.current.uv_index * 10) / 10,
+  };
+
+  const forecast: ForecastDay[] = (data.daily.time as string[]).map((date: string, i: number) => ({
+    date,
+    maxTempC:    Math.round(data.daily.temperature_2m_max[i] * 10) / 10,
+    minTempC:    Math.round(data.daily.temperature_2m_min[i] * 10) / 10,
+    maxHumidity: Math.round(data.daily.relative_humidity_2m_max[i]),
+    precipMm:    Math.round(data.daily.precipitation_sum[i] * 10) / 10,
+    weatherCode: data.daily.weathercode[i],
+    windSpeedMax: Math.round(data.daily.wind_speed_10m_max[i]),
+    uvIndexMax:  Math.round(data.daily.uv_index_max[i] * 10) / 10,
+  }));
+
+  return { current, forecast };
 }

@@ -1,100 +1,148 @@
-// Mix class base water-cement ratios (by weight)
-export const MIX_CLASS_BASE_WCR: Record<string, number> = {
-  A: 0.45, // High strength: columns, beams, footings (1:1.5:3)
-  B: 0.55, // Medium: floor slabs, walls (1:2:4)
-  C: 0.65, // Low: fence posts, non-structural fills (1:3:6)
+// Mix classes — plain English, not A/B/C
+export type MixClassKey = "high" | "general" | "basic";
+
+export const MIX_CLASSES: Record<MixClassKey, {
+  label: string;
+  subtitle: string;
+  ratio: string;
+  mpaMid: number;
+  uses: string[];
+  wcr: number;
+  proportions: { sand: number; gravel: number };
+  color: string;
+  borderColor: string;
+}> = {
+  high: {
+    label: "High Strength",
+    subtitle: "Structural elements",
+    ratio: "1 : 1.5 : 3",
+    mpaMid: 25,
+    uses: ["Columns", "Footings", "Beams", "Stairs"],
+    wcr: 0.45,
+    proportions: { sand: 1.5, gravel: 3 },
+    color: "text-red-600",
+    borderColor: "border-red-500",
+  },
+  general: {
+    label: "General Purpose",
+    subtitle: "Most common pours",
+    ratio: "1 : 2 : 4",
+    mpaMid: 20,
+    uses: ["Floor slabs", "Walls", "Driveways", "Garden paths"],
+    wcr: 0.55,
+    proportions: { sand: 2, gravel: 4 },
+    color: "text-orange-600",
+    borderColor: "border-orange-400",
+  },
+  basic: {
+    label: "Basic Mix",
+    subtitle: "Non-structural",
+    ratio: "1 : 3 : 6",
+    mpaMid: 15,
+    uses: ["Fence posts", "Fill concrete", "Bedding mortar"],
+    wcr: 0.65,
+    proportions: { sand: 3, gravel: 6 },
+    color: "text-slate-600",
+    borderColor: "border-slate-400",
+  },
 };
 
-export const MIX_CLASS_LABELS: Record<string, Record<string, string>> = {
-  en: { A: "Class A — Structural (columns, footings)", B: "Class B — General (slabs, walls)", C: "Class C — Light (posts, fill)" },
-  th: { A: "คลาส A — โครงสร้าง", B: "คลาส B — ทั่วไป", C: "คลาส C — เบา" },
-  tl: { A: "Klase A — Istruktura", B: "Klase B — Pangkalahatan", C: "Klase C — Magaan" },
-  id: { A: "Kelas A — Struktural", B: "Kelas B — Umum", C: "Kelas C — Ringan" },
-};
-
-// Mix proportions (cement : sand : gravel by volume, 1 bag = 50kg cement)
-export const MIX_PROPORTIONS: Record<string, { cement: number; sand: number; gravel: number; cementKg: number }> = {
-  A: { cement: 1, sand: 1.5, gravel: 3, cementKg: 50 },
-  B: { cement: 1, sand: 2, gravel: 4, cementKg: 50 },
-  C: { cement: 1, sand: 3, gravel: 6, cementKg: 50 },
-};
-
-// Application types (note: 'id_text' is the Indonesian translation to avoid conflict with the 'id' key)
+// Application types with recommended mix class
 export type ApplicationType = {
   id: string;
-  en: string;
-  th: string;
-  tl: string;
-  id_text: string;
+  label: string;
+  icon: string;
+  recommended: MixClassKey;
+  isStructural: boolean;
 };
 
 export const APPLICATION_TYPES: ApplicationType[] = [
-  { id: "footing", en: "Column footing / Foundation", th: "ฐานราก", tl: "Pundasyon", id_text: "Pondasi" },
-  { id: "column", en: "Column / Beam", th: "เสา / คาน", tl: "Haligi / Vigas", id_text: "Kolom / Balok" },
-  { id: "slab", en: "Floor slab", th: "พื้น", tl: "Sahig", id_text: "Pelat lantai" },
-  { id: "wall", en: "Wall / Fence", th: "กำแพง / รั้ว", tl: "Dingding / Bakod", id_text: "Dinding / Pagar" },
-  { id: "post", en: "Fence post / Pole", th: "เสาเข็ม", tl: "Poste", id_text: "Tiang pagar" },
-  { id: "slope", en: "Ramp / Canal / Slope", th: "ทางลาด / ท่อระบายน้ำ", tl: "Rampa / Kanal", id_text: "Ramp / Saluran" },
-  { id: "blocks", en: "Concrete blocks", th: "บล็อกคอนกรีต", tl: "Bloke ng kongkreto", id_text: "Batako" },
+  { id: "footing",  label: "Column Footing / Foundation", icon: "⬛", recommended: "high",    isStructural: true  },
+  { id: "column",   label: "Column / Beam",               icon: "🏛️", recommended: "high",    isStructural: true  },
+  { id: "slab",     label: "Floor Slab",                  icon: "▭",  recommended: "general", isStructural: false },
+  { id: "wall",     label: "Wall / Fence Panel",          icon: "🧱", recommended: "general", isStructural: false },
+  { id: "stairs",   label: "Stairs / Steps",              icon: "📶", recommended: "high",    isStructural: true  },
+  { id: "driveway", label: "Driveway / Path",             icon: "🛣️", recommended: "general", isStructural: false },
+  { id: "post",     label: "Fence Post / Pole",           icon: "📌", recommended: "basic",   isStructural: false },
+  { id: "slope",    label: "Ramp / Canal / Slope",        icon: "📐", recommended: "general", isStructural: false },
+  { id: "blocks",   label: "Concrete Blocks",             icon: "🟦", recommended: "basic",   isStructural: false },
 ];
 
-// Sand type adjustments to WCR (crushed/manufactured sand absorbs more water)
+// Sand type adjustments
 export const SAND_ADJUSTMENTS: Record<string, number> = {
-  river: 0,      // River sand (smooth, fine) — baseline
-  crushed: 0.03, // Crushed rock / manufactured sand (sharp, porous) — needs slightly more water
-  mixed: 0.015,  // Mixed / unknown
+  river:   0,     // baseline
+  crushed: 0.03,  // needs slightly more water
+  mixed:   0.015,
 };
 
-// Humidity adjustments to water addition (liters per 50kg bag)
-// High humidity = sand already holds more moisture = reduce added water
+// Humidity → water adjustment (L per 50kg bag)
 export function getHumidityWaterAdj(humidity: number): number {
-  if (humidity >= 90) return -0.8; // Very humid: sand is pre-wetted
+  if (humidity >= 90) return -0.8;
   if (humidity >= 80) return -0.4;
   if (humidity >= 70) return -0.2;
-  if (humidity >= 60) return 0;    // Baseline
-  if (humidity >= 50) return 0.2;  // Drier: sand is drier
-  return 0.4;                      // Very dry
+  if (humidity >= 60) return 0;
+  if (humidity >= 50) return 0.2;
+  return 0.4;
 }
 
-// Temperature adjustments to water addition (liters per 50kg bag)
-// High temp = faster evaporation during mixing = slightly more water to compensate
+// Temperature → water adjustment (L per 50kg bag)
 export function getTempWaterAdj(tempC: number): number {
   if (tempC >= 38) return 0.5;
   if (tempC >= 34) return 0.3;
   if (tempC >= 30) return 0.1;
-  if (tempC >= 25) return 0;   // Baseline
-  return -0.2;                 // Cool conditions
+  if (tempC >= 25) return 0;
+  return -0.2;
 }
 
-// Cement age strength factor (humidity storage degrades Portland cement)
-// Returns a label + warning, not a WCR adjustment (old cement = use fresh if possible)
-export function getCementAgeWarning(months: number): { level: "ok" | "warn" | "danger"; en: string; th: string; tl: string; id: string } {
-  if (months <= 1) return { level: "ok", en: "Fresh — full strength expected", th: "ใหม่ — ความแข็งแรงเต็มที่", tl: "Sariwa — buong lakas", id: "Segar — kekuatan penuh" };
-  if (months <= 3) return { level: "warn", en: "OK but check for lumps. Sieve if needed.", th: "โอเค แต่ตรวจก้อน ร่อนถ้าจำเป็น", tl: "OK ngunit suriin ang tipak. Salain kung kailangan.", id: "OK tapi periksa gumpalan. Ayak jika perlu." };
-  if (months <= 6) return { level: "warn", en: "Degraded — strength may be 10-20% lower. Use Class A for structural work.", th: "ลดลง — ความแข็งแรงอาจลดลง 10-20%", tl: "Bumaba — lakas maaaring 10-20% mas mababa", id: "Turun — kekuatan mungkin 10-20% lebih rendah" };
-  return { level: "danger", en: "Significantly degraded. Do NOT use for structural work (columns, footings, beams).", th: "ลดลงมาก — ห้ามใช้กับงานโครงสร้าง", tl: "Malubhang bumaba — HUWAG gamitin para sa istruktura", id: "Turun signifikan — JANGAN gunakan untuk struktural" };
+// Cement age warning
+export function getCementAgeWarning(months: number): { level: "ok" | "warn" | "danger"; message: string } {
+  if (months <= 1) return { level: "ok",     message: "Fresh — full strength expected" };
+  if (months <= 3) return { level: "warn",   message: "OK but check for lumps. Sieve if needed." };
+  if (months <= 6) return { level: "warn",   message: "Degraded — strength may be 10–20% lower. Use High Strength for structural work." };
+  return           { level: "danger", message: "Significantly degraded. Do NOT use for columns, footings or beams." };
 }
 
-// Curing time in days for 70% strength (adjusted for humidity)
-// High humidity = slower evaporation = longer moist cure needed
-export function getCureTime(humidity: number, applicationId: string): { minDays: number; note: Record<string, string> } {
-  const isStructural = ["footing", "column"].includes(applicationId);
+// Curing time (days to keep wet)
+export function getCureTime(humidity: number, isStructural: boolean): { minDays: number; note: string } {
   const base = isStructural ? 14 : 7;
-
   let days = base;
-  if (humidity >= 85) days = Math.round(base * 1.4); // Slow cure in very high humidity
+  if (humidity >= 85) days = Math.round(base * 1.4);
   else if (humidity >= 75) days = Math.round(base * 1.2);
-  else if (humidity < 60) days = Math.round(base * 0.9); // Drier = cure faster but watch cracking
+  else if (humidity < 60) days = Math.round(base * 0.9);
 
   return {
     minDays: days,
-    note: {
-      en: humidity >= 85
-        ? `Keep surface wet for ${days} days. In high humidity, test with a plastic sheet — if moisture collects under it after 24h, the slab is still curing.`
-        : `Keep surface wet for ${days} days. Water lightly morning and evening.`,
-      th: `รักษาความชื้นพื้นผิว ${days} วัน`,
-      tl: `Panatilihing basa ang ibabaw sa loob ng ${days} araw.`,
-      id: `Jaga permukaan tetap lembab selama ${days} hari.`,
-    },
+    note: humidity >= 85
+      ? `Keep surface wet for ${days} days. High humidity slows evaporation — test with a plastic sheet: moisture condensing underneath means still curing.`
+      : `Keep surface wet for ${days} days. Water lightly morning and evening.`,
   };
+}
+
+// WMO weather codes → description
+export const WEATHER_CODES: Record<number, { label: string; icon: string }> = {
+  0:  { label: "Clear sky",        icon: "☀️" },
+  1:  { label: "Mainly clear",     icon: "🌤️" },
+  2:  { label: "Partly cloudy",    icon: "⛅" },
+  3:  { label: "Overcast",         icon: "☁️" },
+  45: { label: "Fog",              icon: "🌫️" },
+  48: { label: "Icy fog",          icon: "🌫️" },
+  51: { label: "Light drizzle",    icon: "🌦️" },
+  53: { label: "Drizzle",          icon: "🌦️" },
+  61: { label: "Light rain",       icon: "🌧️" },
+  63: { label: "Rain",             icon: "🌧️" },
+  65: { label: "Heavy rain",       icon: "🌧️" },
+  80: { label: "Rain showers",     icon: "🌦️" },
+  81: { label: "Showers",          icon: "🌧️" },
+  82: { label: "Violent showers",  icon: "⛈️" },
+  95: { label: "Thunderstorm",     icon: "⛈️" },
+  99: { label: "Thunderstorm+",    icon: "⛈️" },
+};
+
+export function getWeatherInfo(code: number): { label: string; icon: string } {
+  // Find closest matching code
+  const known = Object.keys(WEATHER_CODES).map(Number).sort((a, b) => a - b);
+  for (let i = known.length - 1; i >= 0; i--) {
+    if (code >= known[i]) return WEATHER_CODES[known[i]];
+  }
+  return { label: "Unknown", icon: "🌡️" };
 }

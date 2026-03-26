@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git *)",
+      "Bash(gemini *)",
+      "Bash(npx *)",
+      "Bash(vercel *)",
+      "Bash(gh *)",
+      "Bash(mkdir *)",
+      "Bash(cat *)",
+      "Bash(echo *)"
+    ]
+  }
+}

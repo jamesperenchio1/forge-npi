@@ -16,3 +16,16 @@
 **Alternative considered**: Maritime (fishing vessel maintenance logs) — deprioritized for later cycle
 
 **Next action**: Scout runs Gemini research, Director distills to brief, Validator runs gauntlet
+
+## 2026-03-26 — GO on MixRight
+
+**Decision**: Build MixRight — tropical SEA concrete mix assistant
+
+**Validation result**: All 5 questions PASS
+- Q1: Real problem — 10 independent sources, PH/TH/ID/MY, recurring theme in large communities
+- Q2: No adequate solution — all existing apps are volume calculators, zero humidity/temp inputs
+- Q3: Open-Meteo API confirmed free, no-key, endpoint verified, 10k req/day rate limit
+- Q4: Niche confirmed — initial wedge: Filipino OFW self-builders (digitally savvy, construction-motivated)
+- Q5: Daily use case — multiple pours per week per project, intra-day weather variance forces recalculation
+
+**Next steps**: Architect + Dev Expert spawned, build/mixright branch, scaffold Next.js PWA

@@ -3,12 +3,14 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { MIX_CLASSES } from "@/lib/constants";
+import { MIX_CLASSES, APPLICATION_TYPES } from "@/lib/constants";
 import type { MultiMixResult } from "@/lib/mixCalculator";
 
 interface Props {
   result: MultiMixResult;
   projectRef: string;
+  humidity: number;
+  tempC: number;
 }
 
 const CURING_METHODS = [
@@ -32,7 +34,35 @@ const CURING_METHODS = [
   },
 ];
 
-export default function ResultsDashboard({ result, projectRef }: Props) {
+function getCureExplanation(humidity: number, isStructural: boolean) {
+  const base = isStructural ? 14 : 7;
+  let multiplier = 1.0;
+  let humidityLabel = "";
+  let humidityReason = "";
+
+  if (humidity >= 85) {
+    multiplier = 1.4;
+    humidityLabel = `${humidity}% — tropical / rainy season`;
+    humidityReason = "Air is near-saturated, so concrete surface moisture evaporates very slowly. You have a longer window of active hydration — use it.";
+  } else if (humidity >= 75) {
+    multiplier = 1.2;
+    humidityLabel = `${humidity}% — humid`;
+    humidityReason = "Humid air slows surface drying. Extending curing by 20% improves final strength.";
+  } else if (humidity >= 60) {
+    multiplier = 1.0;
+    humidityLabel = `${humidity}% — moderate`;
+    humidityReason = "Normal conditions. Standard curing period applies.";
+  } else {
+    multiplier = 0.9;
+    humidityLabel = `${humidity}% — dry`;
+    humidityReason = "Low humidity means fast evaporation. Water more often during this shorter window.";
+  }
+
+  const days = Math.round(base * multiplier);
+  return { base, multiplier, days, humidityLabel, humidityReason };
+}
+
+export default function ResultsDashboard({ result, projectRef, humidity, tempC }: Props) {
   const hasMultiple = result.perApp.length > 1;
 
   return (
@@ -101,11 +131,78 @@ export default function ResultsDashboard({ result, projectRef }: Props) {
               </div>
 
               {/* Cure time */}
-              <div className="bg-muted/40 rounded-lg px-3 py-2">
-                <div className="text-xs font-semibold text-muted-foreground">Keep wet for</div>
-                <div className="text-lg font-black text-primary">{app.cureTime.minDays} days</div>
-                <div className="text-xs text-muted-foreground mt-0.5">{app.cureTime.note}</div>
-              </div>
+              {(() => {
+                const appType = APPLICATION_TYPES.find(a => a.id === app.applicationId);
+                const explanation = getCureExplanation(humidity, appType?.isStructural ?? false);
+                return (
+                  <div className="bg-muted/40 rounded-lg px-3 py-3 space-y-3">
+                    <div>
+                      <div className="text-xs font-semibold text-muted-foreground">Keep wet for</div>
+                      <div className="text-lg font-black text-primary">{app.cureTime.minDays} days</div>
+                      <div className="text-xs text-muted-foreground mt-0.5">{app.cureTime.note}</div>
+                    </div>
+
+                    {/* How this was calculated */}
+                    <div className="border-t border-border/40 pt-2 space-y-2">
+                      <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">How this number was calculated</div>
+
+                      <div className="text-xs space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className="text-muted-foreground">Base ({explanation.base === 14 ? "structural element" : "non-structural"})</span>
+                          <span className="font-mono font-bold">{explanation.base} days</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-muted-foreground">Humidity: {explanation.humidityLabel}</span>
+                          <span className="font-mono font-bold">× {explanation.multiplier}</span>
+                        </div>
+                        <div className="flex items-center justify-between border-t border-border/40 pt-1">
+                          <span className="font-semibold">{explanation.base} × {explanation.multiplier} = {explanation.days} days</span>
+                          <span className="font-mono font-black text-primary">{explanation.days}d</span>
+                        </div>
+                      </div>
+
+                      <p className="text-xs text-muted-foreground italic">{explanation.humidityReason}</p>
+
+                      <div className="bg-background/60 rounded-lg px-3 py-2 space-y-1">
+                        <div className="text-xs font-semibold">Why does keeping it wet matter?</div>
+                        <p className="text-xs text-muted-foreground">
+                          Concrete doesn't "dry" to get strong — it <span className="font-semibold text-foreground">reacts with water</span> (hydration).
+                          If the surface dries out before {explanation.days} days, the reaction stops permanently and the concrete is weaker than it should be.
+                          Water morning and evening, or lay damp hessian under plastic sheeting.
+                        </p>
+                      </div>
+
+                      <div className="bg-background/60 rounded-lg px-3 py-2 space-y-1">
+                        <div className="text-xs font-semibold">Why does humidity change the number?</div>
+                        <p className="text-xs text-muted-foreground">
+                          {humidity >= 75
+                            ? `At ${humidity}% humidity, the air is already holding a lot of moisture. Your concrete surface won't dry out as fast — which is good. The longer window means you can keep the hydration reaction running for more days, which builds more strength.`
+                            : `At ${humidity}% humidity, the air is relatively dry and pulls moisture out of the concrete quickly. You need to work harder (water more often), but the accelerated evaporation also slightly speeds up the reaction, so the total window is a bit shorter.`
+                          }
+                        </p>
+                      </div>
+
+                      <div className="bg-background/60 rounded-lg px-3 py-2 space-y-1">
+                        <div className="text-xs font-semibold">The humidity multiplier table</div>
+                        <div className="text-xs font-mono space-y-0.5 text-muted-foreground">
+                          <div className={`flex justify-between ${humidity >= 85 ? "text-primary font-bold" : ""}`}>
+                            <span>85%+ (rainy season)</span><span>base × 1.4</span>
+                          </div>
+                          <div className={`flex justify-between ${humidity >= 75 && humidity < 85 ? "text-primary font-bold" : ""}`}>
+                            <span>75–84% (humid)</span><span>base × 1.2</span>
+                          </div>
+                          <div className={`flex justify-between ${humidity >= 60 && humidity < 75 ? "text-primary font-bold" : ""}`}>
+                            <span>60–74% (moderate)</span><span>base × 1.0</span>
+                          </div>
+                          <div className={`flex justify-between ${humidity < 60 ? "text-primary font-bold" : ""}`}>
+                            <span>below 60% (dry)</span><span>base × 0.9</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
             </CardContent>
           </Card>
         );

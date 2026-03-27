@@ -310,7 +310,12 @@ export default function Home() {
                 </div>
               ) : (
                 <>
-                  <ResultsDashboard result={result} projectRef={projectRef} />
+                  <ResultsDashboard
+                    result={result}
+                    projectRef={projectRef}
+                    humidity={currentWeather?.humidityPct ?? 70}
+                    tempC={currentWeather?.temperatureC ?? 28}
+                  />
 
                   {pourDate && pourDateObj && currentWeather && (
                     <>

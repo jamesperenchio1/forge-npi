@@ -80,7 +80,7 @@ export default function ResultsDashboard({ result, projectRef, humidity, tempC }
         <Card className={`border-2 ${result.cementWarning.level === "danger" ? "border-destructive bg-destructive/5" : "border-yellow-400 bg-yellow-50"}`}>
           <CardContent className="pt-3 pb-3">
             <p className={`text-sm font-semibold ${result.cementWarning.level === "danger" ? "text-destructive" : "text-yellow-700"}`}>
-              ⚠ {result.cementWarning.message}
+              {result.cementWarning.message}
             </p>
           </CardContent>
         </Card>

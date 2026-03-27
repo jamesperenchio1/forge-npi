@@ -100,7 +100,7 @@ export default function LifecycleTimeline({ pourDate, tempC, humidity, isStructu
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between gap-1">
                   <span className={`text-sm font-semibold ${isNow ? "text-primary" : "text-foreground"}`}>
-                    {isNow && "▶ "}{stage.name}
+                    {stage.name}
                   </span>
                   {isNow && <span className="text-xs bg-primary text-primary-foreground px-2 py-0.5 rounded-full font-medium shrink-0">NOW</span>}
                   {isPast && <span className="text-xs text-muted-foreground shrink-0">Done</span>}
@@ -125,7 +125,7 @@ export default function LifecycleTimeline({ pourDate, tempC, humidity, isStructu
                     <ul className="space-y-1">
                       {stage.actions.map((a, i) => (
                         <li key={i} className="text-xs flex gap-1.5">
-                          <span className="text-primary shrink-0">→</span>
+                          <span className="text-primary shrink-0">-</span>
                           <span>{a}</span>
                         </li>
                       ))}
@@ -136,7 +136,7 @@ export default function LifecycleTimeline({ pourDate, tempC, humidity, isStructu
                 {stage.warnings.length > 0 && (
                   <div className="bg-destructive/5 border border-destructive/20 rounded-lg px-3 py-2 space-y-1">
                     {stage.warnings.map((w, i) => (
-                      <p key={i} className="text-xs text-destructive font-medium">⚠ {w}</p>
+                      <p key={i} className="text-xs text-destructive font-medium">{w}</p>
                     ))}
                   </div>
                 )}

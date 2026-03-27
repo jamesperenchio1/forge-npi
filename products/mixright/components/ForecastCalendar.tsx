@@ -44,7 +44,6 @@ export default function ForecastCalendar({ forecast, selectedDate, onSelect }: P
           >
             <div className="flex items-center justify-between mb-1">
               <div className="flex items-center gap-2">
-                <span className="text-lg">{weather.icon}</span>
                 <div>
                   <div className="font-semibold text-sm">{dayLabel(day.date)}</div>
                   <div className="text-xs text-muted-foreground">{weather.label}</div>

@@ -42,7 +42,6 @@ export default function ApplicationSelector({ selected, onChange }: Props) {
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <span className="text-base">{app.icon}</span>
                   <span className={`text-sm font-semibold ${isSelected ? "text-foreground" : "text-muted-foreground"}`}>
                     {app.label}
                   </span>

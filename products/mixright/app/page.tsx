@@ -271,7 +271,6 @@ export default function Home() {
             <>
               {forecast.length === 0 ? (
                 <div className="text-center py-10 space-y-3">
-                  <div className="text-4xl">📍</div>
                   <p className="text-muted-foreground text-sm">Set your location first to see the 7-day forecast.</p>
                   <Button variant="outline" onClick={() => setTab("location")}>Go to Location</Button>
                 </div>
@@ -304,7 +303,6 @@ export default function Home() {
             <>
               {!result ? (
                 <div className="text-center py-10 space-y-3">
-                  <div className="text-4xl">🧮</div>
                   <p className="text-muted-foreground text-sm">Complete the Mix tab and calculate to see results.</p>
                   <Button variant="outline" onClick={() => setTab("mix")}>Go to Mix</Button>
                 </div>

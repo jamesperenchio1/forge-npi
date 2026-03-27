@@ -57,15 +57,15 @@ export type ApplicationType = {
 };
 
 export const APPLICATION_TYPES: ApplicationType[] = [
-  { id: "footing",  label: "Column Footing / Foundation", icon: "⬛", recommended: "high",    isStructural: true  },
-  { id: "column",   label: "Column / Beam",               icon: "🏛️", recommended: "high",    isStructural: true  },
-  { id: "slab",     label: "Floor Slab",                  icon: "▭",  recommended: "general", isStructural: false },
-  { id: "wall",     label: "Wall / Fence Panel",          icon: "🧱", recommended: "general", isStructural: false },
-  { id: "stairs",   label: "Stairs / Steps",              icon: "📶", recommended: "high",    isStructural: true  },
-  { id: "driveway", label: "Driveway / Path",             icon: "🛣️", recommended: "general", isStructural: false },
-  { id: "post",     label: "Fence Post / Pole",           icon: "📌", recommended: "basic",   isStructural: false },
-  { id: "slope",    label: "Ramp / Canal / Slope",        icon: "📐", recommended: "general", isStructural: false },
-  { id: "blocks",   label: "Concrete Blocks",             icon: "🟦", recommended: "basic",   isStructural: false },
+  { id: "footing",  label: "Column Footing / Foundation", icon: "", recommended: "high",    isStructural: true  },
+  { id: "column",   label: "Column / Beam",               icon: "", recommended: "high",    isStructural: true  },
+  { id: "slab",     label: "Floor Slab",                  icon: "", recommended: "general", isStructural: false },
+  { id: "wall",     label: "Wall / Fence Panel",          icon: "", recommended: "general", isStructural: false },
+  { id: "stairs",   label: "Stairs / Steps",              icon: "", recommended: "high",    isStructural: true  },
+  { id: "driveway", label: "Driveway / Path",             icon: "", recommended: "general", isStructural: false },
+  { id: "post",     label: "Fence Post / Pole",           icon: "", recommended: "basic",   isStructural: false },
+  { id: "slope",    label: "Ramp / Canal / Slope",        icon: "", recommended: "general", isStructural: false },
+  { id: "blocks",   label: "Concrete Blocks",             icon: "", recommended: "basic",   isStructural: false },
 ];
 
 // Sand type adjustments
@@ -120,22 +120,22 @@ export function getCureTime(humidity: number, isStructural: boolean): { minDays:
 
 // WMO weather codes → description
 export const WEATHER_CODES: Record<number, { label: string; icon: string }> = {
-  0:  { label: "Clear sky",        icon: "☀️" },
-  1:  { label: "Mainly clear",     icon: "🌤️" },
-  2:  { label: "Partly cloudy",    icon: "⛅" },
-  3:  { label: "Overcast",         icon: "☁️" },
-  45: { label: "Fog",              icon: "🌫️" },
-  48: { label: "Icy fog",          icon: "🌫️" },
-  51: { label: "Light drizzle",    icon: "🌦️" },
-  53: { label: "Drizzle",          icon: "🌦️" },
-  61: { label: "Light rain",       icon: "🌧️" },
-  63: { label: "Rain",             icon: "🌧️" },
-  65: { label: "Heavy rain",       icon: "🌧️" },
-  80: { label: "Rain showers",     icon: "🌦️" },
-  81: { label: "Showers",          icon: "🌧️" },
-  82: { label: "Violent showers",  icon: "⛈️" },
-  95: { label: "Thunderstorm",     icon: "⛈️" },
-  99: { label: "Thunderstorm+",    icon: "⛈️" },
+  0:  { label: "Clear sky",        icon: "" },
+  1:  { label: "Mainly clear",     icon: "" },
+  2:  { label: "Partly cloudy",    icon: "" },
+  3:  { label: "Overcast",         icon: "" },
+  45: { label: "Fog",              icon: "" },
+  48: { label: "Icy fog",          icon: "" },
+  51: { label: "Light drizzle",    icon: "" },
+  53: { label: "Drizzle",          icon: "" },
+  61: { label: "Light rain",       icon: "" },
+  63: { label: "Rain",             icon: "" },
+  65: { label: "Heavy rain",       icon: "" },
+  80: { label: "Rain showers",     icon: "" },
+  81: { label: "Showers",          icon: "" },
+  82: { label: "Violent showers",  icon: "" },
+  95: { label: "Thunderstorm",     icon: "" },
+  99: { label: "Thunderstorm+",    icon: "" },
 };
 
 export function getWeatherInfo(code: number): { label: string; icon: string } {
@@ -144,5 +144,5 @@ export function getWeatherInfo(code: number): { label: string; icon: string } {
   for (let i = known.length - 1; i >= 0; i--) {
     if (code >= known[i]) return WEATHER_CODES[known[i]];
   }
-  return { label: "Unknown", icon: "🌡️" };
+  return { label: "Unknown", icon: "" };
 }

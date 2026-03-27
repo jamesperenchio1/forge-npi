@@ -1,0 +1,6 @@
+{
+  "buildCommand": "cd products/mixright && npm install && npm run build",
+  "outputDirectory": "products/mixright/.next",
+  "installCommand": "echo skip",
+  "framework": "nextjs"
+}

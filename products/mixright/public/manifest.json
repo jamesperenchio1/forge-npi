@@ -1,0 +1,27 @@
+{
+  "name": "MixRight — Concrete Calculator",
+  "short_name": "MixRight",
+  "description": "Hand-mixed concrete calculator for tropical Southeast Asia. Adjusts water-cement ratio for real-time humidity and temperature.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f8f0e8",
+  "theme_color": "#c2661f",
+  "orientation": "portrait-primary",
+  "categories": ["utilities", "productivity"],
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "any",
+      "type": "image/x-icon",
+      "purpose": "any"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Calculate Mix",
+      "short_name": "Calculate",
+      "description": "Jump straight to mix configuration",
+      "url": "/?tab=mix"
+    }
+  ]
+}

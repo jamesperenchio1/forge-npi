@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+import { Share2, Check } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -11,6 +13,8 @@ interface Props {
   projectRef: string;
   humidity: number;
   tempC: number;
+  lat?: number;
+  lng?: number;
 }
 
 const CURING_METHODS = [
@@ -62,11 +66,67 @@ function getCureExplanation(humidity: number, isStructural: boolean) {
   return { base, multiplier, days, humidityLabel, humidityReason };
 }
 
-export default function ResultsDashboard({ result, projectRef, humidity, tempC }: Props) {
+function buildShareText(result: MultiMixResult, projectRef: string, tempC: number, humidity: number, lat?: number, lng?: number): string {
+  const lines: string[] = ["MixRight — Concrete Mix Recipe"];
+  if (projectRef) lines.push(`Project: ${projectRef}`);
+  if (lat !== undefined && lng !== undefined) {
+    lines.push(`Location: ${lat.toFixed(2)}°, ${lng.toFixed(2)}°  |  ${tempC}°C  ${humidity}% RH`);
+  }
+  lines.push("");
+  result.perApp.forEach(app => {
+    const cls = MIX_CLASSES[app.mixClass];
+    lines.push(`── ${app.applicationLabel} (${cls.label}, ${cls.ratio})`);
+    lines.push(`   Water: ${app.waterPerBag}L per bag${app.numBags > 1 ? ` · Total ${app.totalWater}L for ${app.numBags} bags` : ""}`);
+    lines.push(`   Per bag: 1 cement : ${app.buckets.sand}× sand : ${app.buckets.gravel}× gravel (20L buckets)`);
+    lines.push(`   Keep wet: ${app.cureTime.minDays} days`);
+  });
+  if (result.perApp.length > 1) {
+    lines.push("");
+    lines.push(`TOTALS: ${result.totals.totalBags} bags · ${result.totals.totalWater}L water · ${result.totals.totalSandBuckets}× sand · ${result.totals.totalGravelBuckets}× gravel`);
+  }
+  const adjParts: string[] = [];
+  if (result.adjustments.humidity    !== 0) adjParts.push(`humidity ${result.adjustments.humidity    > 0 ? "+" : ""}${result.adjustments.humidity}L/bag`);
+  if (result.adjustments.temperature !== 0) adjParts.push(`temp ${result.adjustments.temperature     > 0 ? "+" : ""}${result.adjustments.temperature}L/bag`);
+  if (adjParts.length) lines.push(`\nWeather adjustments: ${adjParts.join(", ")}`);
+  lines.push("─");
+  lines.push("MixRight · mixright.vercel.app");
+  return lines.join("\n");
+}
+
+export default function ResultsDashboard({ result, projectRef, humidity, tempC, lat, lng }: Props) {
   const hasMultiple = result.perApp.length > 1;
+  const [copied, setCopied] = useState(false);
+
+  async function handleShare() {
+    const text = buildShareText(result, projectRef, tempC, humidity, lat, lng);
+    if (typeof navigator !== "undefined" && "share" in navigator) {
+      try {
+        await navigator.share({ title: "MixRight — Mix Recipe", text });
+        return;
+      } catch {}
+    }
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+    } catch {}
+  }
 
   return (
     <div className="space-y-4">
+      {/* Share button */}
+      <div className="flex justify-end">
+        <button
+          onClick={handleShare}
+          className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors px-3 py-1.5 rounded-lg hover:bg-muted/50 border border-transparent hover:border-border"
+        >
+          {copied
+            ? <><Check className="w-3.5 h-3.5 text-green-600" /> Copied!</>
+            : <><Share2 className="w-3.5 h-3.5" /> Share recipe</>
+          }
+        </button>
+      </div>
+
       {/* Project reference */}
       {projectRef && (
         <div className="flex items-center gap-2 bg-muted/40 rounded-lg px-3 py-2">

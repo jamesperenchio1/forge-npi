@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { MIX_CLASSES, APPLICATION_TYPES } from "@/lib/constants";
 import type { MultiMixResult } from "@/lib/mixCalculator";
+import type { CuringMethod } from "@/app/page";
 
 interface Props {
   result: MultiMixResult;
@@ -15,28 +16,30 @@ interface Props {
   tempC: number;
   lat?: number;
   lng?: number;
+  curingMethod?: CuringMethod;
+  rebarEnabled?: boolean;
 }
 
-const CURING_METHODS = [
-  {
-    name: "Wet hessian + plastic sheet",
-    when: "Best for structural elements and hot days",
-    how: "Lay damp hessian directly on concrete, cover with plastic to retain moisture. Re-wet hessian 2× daily.",
-    cost: "$",
+const CURING_METHODS: Record<CuringMethod, { label: string; when: string; how: string; cost: string }> = {
+  hessian: {
+    label: "Wet hessian + plastic sheet",
+    when:  "Best for structural elements and hot days",
+    how:   "Lay damp hessian directly on concrete, cover with plastic to retain moisture. Re-wet hessian 2× daily.",
+    cost:  "$",
   },
-  {
-    name: "Plastic sheeting only",
-    when: "Non-structural slabs, light rain risk",
-    how: "Lay plastic directly on concrete immediately after initial set. Weight down the edges. Check for tears daily.",
-    cost: "$",
+  plastic: {
+    label: "Plastic sheeting only",
+    when:  "Non-structural slabs, light rain risk",
+    how:   "Lay plastic directly on concrete immediately after initial set. Weight down the edges. Check for tears daily.",
+    cost:  "$",
   },
-  {
-    name: "Curing compound (spray)",
-    when: "Large areas, dry/windy conditions",
-    how: "Spray evenly immediately after finishing. Forms a membrane that retains moisture. Cannot tile over — must be mechanically removed.",
-    cost: "$$",
+  compound: {
+    label: "Curing compound (spray)",
+    when:  "Large areas, dry/windy conditions",
+    how:   "Spray evenly immediately after finishing. Forms a membrane that retains moisture. Cannot tile over — must be mechanically removed.",
+    cost:  "$$",
   },
-];
+};
 
 function getCureExplanation(humidity: number, isStructural: boolean) {
   const base = isStructural ? 14 : 7;
@@ -66,19 +69,31 @@ function getCureExplanation(humidity: number, isStructural: boolean) {
   return { base, multiplier, days, humidityLabel, humidityReason };
 }
 
-function buildShareText(result: MultiMixResult, projectRef: string, tempC: number, humidity: number, lat?: number, lng?: number): string {
+function buildShareText(
+  result: MultiMixResult,
+  projectRef: string,
+  tempC: number,
+  humidity: number,
+  curingMethod: CuringMethod,
+  rebarEnabled: boolean,
+  lat?: number,
+  lng?: number,
+): string {
+  const m = CURING_METHODS[curingMethod];
   const lines: string[] = ["MixRight — Concrete Mix Recipe"];
   if (projectRef) lines.push(`Project: ${projectRef}`);
   if (lat !== undefined && lng !== undefined) {
     lines.push(`Location: ${lat.toFixed(2)}°, ${lng.toFixed(2)}°  |  ${tempC}°C  ${humidity}% RH`);
   }
+  if (rebarEnabled) lines.push("Reinforced concrete (rebar/mesh)");
+  lines.push(`Curing method: ${m.label}`);
   lines.push("");
   result.perApp.forEach(app => {
     const cls = MIX_CLASSES[app.mixClass];
     lines.push(`── ${app.applicationLabel} (${cls.label}, ${cls.ratio})`);
     lines.push(`   Water: ${app.waterPerBag}L per bag${app.numBags > 1 ? ` · Total ${app.totalWater}L for ${app.numBags} bags` : ""}`);
     lines.push(`   Per bag: 1 cement : ${app.buckets.sand}× sand : ${app.buckets.gravel}× gravel (20L buckets)`);
-    lines.push(`   Keep wet: ${app.cureTime.minDays} days`);
+    lines.push(`   Keep wet: ${app.cureTime.minDays} days — ${m.label}`);
   });
   if (result.perApp.length > 1) {
     lines.push("");
@@ -93,17 +108,20 @@ function buildShareText(result: MultiMixResult, projectRef: string, tempC: numbe
   return lines.join("\n");
 }
 
-export default function ResultsDashboard({ result, projectRef, humidity, tempC, lat, lng }: Props) {
+export default function ResultsDashboard({
+  result, projectRef, humidity, tempC,
+  lat, lng,
+  curingMethod = "hessian",
+  rebarEnabled = false,
+}: Props) {
   const hasMultiple = result.perApp.length > 1;
   const [copied, setCopied] = useState(false);
+  const selectedCuring = CURING_METHODS[curingMethod];
 
   async function handleShare() {
-    const text = buildShareText(result, projectRef, tempC, humidity, lat, lng);
+    const text = buildShareText(result, projectRef, tempC, humidity, curingMethod, rebarEnabled, lat, lng);
     if (typeof navigator !== "undefined" && "share" in navigator) {
-      try {
-        await navigator.share({ title: "MixRight — Mix Recipe", text });
-        return;
-      } catch {}
+      try { await navigator.share({ title: "MixRight — Mix Recipe", text }); return; } catch {}
     }
     try {
       await navigator.clipboard.writeText(text);
@@ -116,8 +134,7 @@ export default function ResultsDashboard({ result, projectRef, humidity, tempC, 
     <div className="space-y-4">
       {/* Share button */}
       <div className="flex justify-end">
-        <button
-          onClick={handleShare}
+        <button onClick={handleShare}
           className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors px-3 py-1.5 rounded-lg hover:bg-muted/50 border border-transparent hover:border-border"
         >
           {copied
@@ -135,6 +152,13 @@ export default function ResultsDashboard({ result, projectRef, humidity, tempC, 
         </div>
       )}
 
+      {/* Rebar badge */}
+      {rebarEnabled && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 text-xs text-blue-800 font-medium">
+          Reinforced concrete — structural classification applied to all curing times
+        </div>
+      )}
+
       {/* Cement warning */}
       {result.cementWarning.level !== "ok" && (
         <Card className={`border-2 ${result.cementWarning.level === "danger" ? "border-destructive bg-destructive/5" : "border-yellow-400 bg-yellow-50"}`}>
@@ -149,6 +173,8 @@ export default function ResultsDashboard({ result, projectRef, humidity, tempC, 
       {/* Per-application results */}
       {result.perApp.map(app => {
         const cls = MIX_CLASSES[app.mixClass];
+        const appType = APPLICATION_TYPES.find(a => a.id === app.applicationId);
+        const explanation = getCureExplanation(humidity, rebarEnabled || (appType?.isStructural ?? false));
         return (
           <Card key={app.applicationId} className="border shadow-sm">
             <CardContent className="pt-4 pb-4 space-y-3">
@@ -190,79 +216,40 @@ export default function ResultsDashboard({ result, projectRef, humidity, tempC, 
                 </div>
               </div>
 
-              {/* Cure time */}
-              {(() => {
-                const appType = APPLICATION_TYPES.find(a => a.id === app.applicationId);
-                const explanation = getCureExplanation(humidity, appType?.isStructural ?? false);
-                return (
-                  <div className="bg-muted/40 rounded-lg px-3 py-3 space-y-3">
-                    <div>
-                      <div className="text-xs font-semibold text-muted-foreground">Keep wet for</div>
-                      <div className="text-lg font-black text-primary">{app.cureTime.minDays} days</div>
-                      <div className="text-xs text-muted-foreground mt-0.5">{app.cureTime.note}</div>
+              {/* Cure time + selected method */}
+              <div className="bg-muted/40 rounded-lg px-3 py-3 space-y-3">
+                <div>
+                  <div className="text-xs font-semibold text-muted-foreground">Keep wet for</div>
+                  <div className="text-lg font-black text-primary">{app.cureTime.minDays} days</div>
+                  <div className="text-xs text-muted-foreground mt-0.5">{app.cureTime.note}</div>
+                </div>
+
+                {/* Selected curing method */}
+                <div className="bg-primary/5 rounded-lg px-3 py-2 border border-primary/20">
+                  <div className="text-xs font-semibold text-primary mb-0.5">Curing method: {selectedCuring.label}</div>
+                  <div className="text-xs text-muted-foreground">{selectedCuring.how}</div>
+                </div>
+
+                {/* Calculation breakdown */}
+                <div className="border-t border-border/40 pt-2 space-y-2">
+                  <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">How this was calculated</div>
+                  <div className="text-xs space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">Base ({explanation.base === 14 ? "structural" : "non-structural"})</span>
+                      <span className="font-mono font-bold">{explanation.base} days</span>
                     </div>
-
-                    {/* How this was calculated */}
-                    <div className="border-t border-border/40 pt-2 space-y-2">
-                      <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">How this number was calculated</div>
-
-                      <div className="text-xs space-y-1">
-                        <div className="flex items-center justify-between">
-                          <span className="text-muted-foreground">Base ({explanation.base === 14 ? "structural element" : "non-structural"})</span>
-                          <span className="font-mono font-bold">{explanation.base} days</span>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-muted-foreground">Humidity: {explanation.humidityLabel}</span>
-                          <span className="font-mono font-bold">× {explanation.multiplier}</span>
-                        </div>
-                        <div className="flex items-center justify-between border-t border-border/40 pt-1">
-                          <span className="font-semibold">{explanation.base} × {explanation.multiplier} = {explanation.days} days</span>
-                          <span className="font-mono font-black text-primary">{explanation.days}d</span>
-                        </div>
-                      </div>
-
-                      <p className="text-xs text-muted-foreground italic">{explanation.humidityReason}</p>
-
-                      <div className="bg-background/60 rounded-lg px-3 py-2 space-y-1">
-                        <div className="text-xs font-semibold">Why does keeping it wet matter?</div>
-                        <p className="text-xs text-muted-foreground">
-                          Concrete doesn't "dry" to get strong — it <span className="font-semibold text-foreground">reacts with water</span> (hydration).
-                          If the surface dries out before {explanation.days} days, the reaction stops permanently and the concrete is weaker than it should be.
-                          Water morning and evening, or lay damp hessian under plastic sheeting.
-                        </p>
-                      </div>
-
-                      <div className="bg-background/60 rounded-lg px-3 py-2 space-y-1">
-                        <div className="text-xs font-semibold">Why does humidity change the number?</div>
-                        <p className="text-xs text-muted-foreground">
-                          {humidity >= 75
-                            ? `At ${humidity}% humidity, the air is already holding a lot of moisture. Your concrete surface won't dry out as fast — which is good. The longer window means you can keep the hydration reaction running for more days, which builds more strength.`
-                            : `At ${humidity}% humidity, the air is relatively dry and pulls moisture out of the concrete quickly. You need to work harder (water more often), but the accelerated evaporation also slightly speeds up the reaction, so the total window is a bit shorter.`
-                          }
-                        </p>
-                      </div>
-
-                      <div className="bg-background/60 rounded-lg px-3 py-2 space-y-1">
-                        <div className="text-xs font-semibold">The humidity multiplier table</div>
-                        <div className="text-xs font-mono space-y-0.5 text-muted-foreground">
-                          <div className={`flex justify-between ${humidity >= 85 ? "text-primary font-bold" : ""}`}>
-                            <span>85%+ (rainy season)</span><span>base × 1.4</span>
-                          </div>
-                          <div className={`flex justify-between ${humidity >= 75 && humidity < 85 ? "text-primary font-bold" : ""}`}>
-                            <span>75–84% (humid)</span><span>base × 1.2</span>
-                          </div>
-                          <div className={`flex justify-between ${humidity >= 60 && humidity < 75 ? "text-primary font-bold" : ""}`}>
-                            <span>60–74% (moderate)</span><span>base × 1.0</span>
-                          </div>
-                          <div className={`flex justify-between ${humidity < 60 ? "text-primary font-bold" : ""}`}>
-                            <span>below 60% (dry)</span><span>base × 0.9</span>
-                          </div>
-                        </div>
-                      </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">Humidity: {explanation.humidityLabel}</span>
+                      <span className="font-mono font-bold">× {explanation.multiplier}</span>
+                    </div>
+                    <div className="flex items-center justify-between border-t border-border/40 pt-1">
+                      <span className="font-semibold">{explanation.base} × {explanation.multiplier} = {explanation.days} days</span>
+                      <span className="font-mono font-black text-primary">{explanation.days}d</span>
                     </div>
                   </div>
-                );
-              })()}
+                  <p className="text-xs text-muted-foreground italic">{explanation.humidityReason}</p>
+                </div>
+              </div>
             </CardContent>
           </Card>
         );
@@ -295,7 +282,7 @@ export default function ResultsDashboard({ result, projectRef, humidity, tempC, 
         </Card>
       )}
 
-      {/* Adjustments */}
+      {/* Weather adjustments */}
       {(result.adjustments.humidity !== 0 || result.adjustments.temperature !== 0) && (
         <Card className="bg-muted/30">
           <CardContent className="pt-3 pb-3">
@@ -324,24 +311,38 @@ export default function ResultsDashboard({ result, projectRef, humidity, tempC, 
 
       <Separator />
 
-      {/* Curing methods */}
-      <div>
-        <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">Curing methods</div>
-        <div className="space-y-2">
-          {CURING_METHODS.map(m => (
-            <Card key={m.name} className="bg-muted/20">
-              <CardContent className="pt-3 pb-3">
-                <div className="flex items-center justify-between mb-1">
-                  <div className="font-semibold text-sm">{m.name}</div>
-                  <span className="text-xs text-muted-foreground font-mono">{m.cost}</span>
-                </div>
-                <div className="text-xs text-primary font-medium mb-1">{m.when}</div>
-                <div className="text-xs text-muted-foreground">{m.how}</div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </div>
+      {/* 28-day cure context */}
+      <Card className="bg-muted/20 border-border">
+        <CardContent className="pt-3 pb-3 space-y-2">
+          <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">About the 28-day cure</div>
+          <p className="text-xs text-muted-foreground leading-relaxed">
+            Yes — 28 days is real. Concrete doesn&apos;t &quot;dry&quot;, it <span className="font-semibold text-foreground">chemically hydrates</span>.
+            Portland cement reacts with water over weeks, not hours. At 7 days you have ~65% strength.
+            At 14 days ~80%. Full design strength is reached at 28 days.
+          </p>
+          <div className="text-xs space-y-0.5 font-mono">
+            <div className="flex items-center gap-2">
+              <div className="h-1.5 bg-amber-400 rounded" style={{ width: "65%" }} />
+              <span className="text-muted-foreground">7 days — 65%</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="h-1.5 bg-orange-400 rounded" style={{ width: "80%" }} />
+              <span className="text-muted-foreground">14 days — 80%</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="h-1.5 bg-primary rounded" style={{ width: "100%" }} />
+              <span className="text-muted-foreground">28 days — 100% (design strength)</span>
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground leading-relaxed">
+            Tiling: wait 4–6 weeks at normal humidity, 8–10 weeks in tropical conditions (&gt;80% RH).
+            Test with plastic sheet taped to floor — condensation underneath means still curing.
+          </p>
+          <div className="text-[10px] text-muted-foreground/60">
+            Sources: ACI 318 (Building Code), ACI 308 (Curing), BS EN 206 (Concrete specification) · Tiling: British Ceramic Tile Council BS 5385
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

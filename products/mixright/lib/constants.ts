@@ -1,5 +1,8 @@
 // Mix classes — plain English, not A/B/C
-export type MixClassKey = "high" | "general" | "basic";
+// C30 (premium) is the practical upper limit for hand mixing.
+// Above C30, water-cement ratio control is too critical for manual batching.
+// Source: ACI 211.1 — Standard Practice for Selecting Proportions for Normal Concrete
+export type MixClassKey = "premium" | "high" | "general" | "basic";
 
 export const MIX_CLASSES: Record<MixClassKey, {
   label: string;
@@ -11,7 +14,20 @@ export const MIX_CLASSES: Record<MixClassKey, {
   proportions: { sand: number; gravel: number };
   color: string;
   borderColor: string;
+  handMixWarning?: string;
 }> = {
+  premium: {
+    label: "C30 Premium",
+    subtitle: "High-load structural — hand-mix limit",
+    ratio: "1 : 1 : 2",
+    mpaMid: 30,
+    uses: ["Retaining walls", "Heavy columns", "Industrial slabs", "Transfer beams"],
+    wcr: 0.40,
+    proportions: { sand: 1, gravel: 2 },
+    color: "text-purple-700",
+    borderColor: "border-purple-500",
+    handMixWarning: "C30 is the maximum reliable strength for hand mixing. WCR 0.40 is very stiff — add water slowly and measure carefully. Consider a mechanical mixer for batches over 3 bags.",
+  },
   high: {
     label: "High Strength",
     subtitle: "Structural elements",

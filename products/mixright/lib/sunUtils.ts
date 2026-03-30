@@ -71,12 +71,14 @@ export function getHeatIndex(tempC: number, humidity: number): number {
   );
 }
 
+// Worker heat stress thresholds based on NIOSH/OSHA heat stress guidelines
+// and the ISO 7933 standard for working in hot environments.
 export function getWorkerRisk(heatIndexC: number): { level: WorkerRisk; label: string; advice: string; color: string } {
-  if (heatIndexC < 27) return { level: "low",       label: "Low",       advice: "Normal work. Stay hydrated.",                          color: "text-green-600" };
-  if (heatIndexC < 33) return { level: "moderate",  label: "Moderate",  advice: "Rest every 45 min in shade. Drink 250ml/hour.",         color: "text-yellow-600" };
-  if (heatIndexC < 40) return { level: "high",      label: "High",      advice: "20 min work / 10 min shade rotation. Buddy system.",   color: "text-orange-600" };
-  if (heatIndexC < 46) return { level: "very_high", label: "Very High", advice: "Limit heavy work. Frequent shade. Watch for symptoms.", color: "text-red-600" };
-  return { level: "extreme", label: "Extreme", advice: "Stop outdoor heavy work. Reschedule pour if possible.",                          color: "text-red-700" };
+  if (heatIndexC < 27) return { level: "low",       label: "Low",       advice: "Safe to work normally. Drink water regularly — at least 250 ml every 20 min.",                                                          color: "text-green-600" };
+  if (heatIndexC < 33) return { level: "moderate",  label: "Moderate",  advice: "Take a 10-min break in shade every hour. Drink 500 ml/hour. Wear a hat and light clothing.",                                             color: "text-yellow-600" };
+  if (heatIndexC < 40) return { level: "high",      label: "High",      advice: "Work in 20-min bursts then 10 min in shade — strictly. Always work in pairs. Stop immediately if anyone feels dizzy, nauseous, or stops sweating.", color: "text-orange-600" };
+  if (heatIndexC < 46) return { level: "very_high", label: "Very High", advice: "Reduce heavy labour to short bursts only. Mandatory shade breaks every 15 min. Watch for heat stroke: confusion, hot dry skin, rapid pulse — call for help immediately.", color: "text-red-600" };
+  return { level: "extreme", label: "Extreme", advice: "Do not perform heavy outdoor work. Reschedule the pour to early morning. Heat stroke risk is severe at this heat index.",                                          color: "text-red-700" };
 }
 
 // Best time of day to pour: find the coolest early-morning window before solar noon

@@ -9,7 +9,8 @@ interface Props {
 
 export default function SunArc({ arcPercent, altitudeDeg, sunriseLabel, sunsetLabel }: Props) {
   const isAboveHorizon = altitudeDeg > 0;
-  const W = 280, H = 110;
+  // Extra top padding so the altitude label never clips at solar noon
+  const W = 280, H = 130, topPad = 20;
   const cx = W / 2, cy = H - 10;
   const rx = 120, ry = 95;
 
@@ -19,6 +20,10 @@ export default function SunArc({ arcPercent, altitudeDeg, sunriseLabel, sunsetLa
   const sunY = cy - ry * Math.sin(t);
 
   const arcPath = `M ${cx - rx} ${cy} A ${rx} ${ry} 0 0 1 ${cx + rx} ${cy}`;
+
+  // When sun is near the top, put the label below the dot to avoid clipping
+  const labelAbove = sunY > topPad + 16;
+  const labelY = labelAbove ? sunY - 12 : sunY + 22;
 
   return (
     <div className="w-full flex flex-col items-center">
@@ -54,9 +59,9 @@ export default function SunArc({ arcPercent, altitudeDeg, sunriseLabel, sunsetLa
         <text x={cx + rx} y={cy + 16} fontSize="9" fill="currentColor"
           opacity="0.5" textAnchor="middle">{sunsetLabel}</text>
 
-        {/* Altitude label near sun */}
+        {/* Altitude label — flips below dot when sun is near zenith */}
         {isAboveHorizon && (
-          <text x={sunX} y={sunY - 12} fontSize="9" fill="#92400E"
+          <text x={sunX} y={labelY} fontSize="9" fill="#92400E"
             textAnchor="middle" fontWeight="bold">{altitudeDeg}°</text>
         )}
       </svg>

@@ -12,15 +12,25 @@ import {
 } from "../constants";
 
 describe("MIX_CLASSES", () => {
-  it("defines high, general, and basic mix classes", () => {
+  it("defines all four mix classes including premium (C30)", () => {
+    expect(MIX_CLASSES).toHaveProperty("premium");
     expect(MIX_CLASSES).toHaveProperty("high");
     expect(MIX_CLASSES).toHaveProperty("general");
     expect(MIX_CLASSES).toHaveProperty("basic");
   });
 
-  it("high strength has lowest WCR (most water-restrictive)", () => {
+  it("WCR increases from premium → high → general → basic (lower WCR = stronger mix)", () => {
+    expect(MIX_CLASSES.premium.wcr).toBeLessThan(MIX_CLASSES.high.wcr);
     expect(MIX_CLASSES.high.wcr).toBeLessThan(MIX_CLASSES.general.wcr);
     expect(MIX_CLASSES.general.wcr).toBeLessThan(MIX_CLASSES.basic.wcr);
+  });
+
+  it("premium (C30) has the highest MPa rating", () => {
+    expect(MIX_CLASSES.premium.mpaMid).toBeGreaterThan(MIX_CLASSES.high.mpaMid);
+  });
+
+  it("premium has a hand-mix warning", () => {
+    expect(MIX_CLASSES.premium.handMixWarning).toBeTruthy();
   });
 
   it("all mix classes have positive proportions", () => {

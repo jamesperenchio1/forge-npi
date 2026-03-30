@@ -5,26 +5,29 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Wind, Droplets, Thermometer, AlertTriangle } from "lucide-react";
 import SunArc from "./SunArc";
+import HourlyTimeline from "./HourlyTimeline";
 import {
   getSunTimes, getSunPosition, getUVRisk, getHeatIndex, getWorkerRisk,
   getBestPourWindow, formatTime,
 } from "@/lib/sunUtils";
-import type { CurrentWeather, ForecastDay } from "@/lib/weatherApi";
+import type { CurrentWeather, ForecastDay, HourlyPoint } from "@/lib/weatherApi";
 
 interface Props {
   lat: number;
   lng: number;
   weather: CurrentWeather;
   todayForecast?: ForecastDay;
+  todayHourly?: HourlyPoint[];
 }
 
-export default function WeatherDashboard({ lat, lng, weather, todayForecast }: Props) {
+export default function WeatherDashboard({ lat, lng, weather, todayForecast, todayHourly = [] }: Props) {
   const [sunData, setSunData] = useState<{
     arcPct: number;
     altDeg: number;
     sunrise: string;
     sunset: string;
     bestWindow: string;
+    currentHour: number;
   } | null>(null);
 
   useEffect(() => {
@@ -35,11 +38,12 @@ export default function WeatherDashboard({ lat, lng, weather, todayForecast }: P
       ? getBestPourWindow(lat, lng, now, todayForecast.maxTempC, todayForecast.minTempC)
       : getBestPourWindow(lat, lng, now, weather.temperatureC + 5, weather.temperatureC - 3);
     setSunData({
-      arcPct:     pos.arcPercent,
-      altDeg:     pos.altitudeDeg,
-      sunrise:    formatTime(times.sunrise),
-      sunset:     formatTime(times.sunset),
+      arcPct:      pos.arcPercent,
+      altDeg:      pos.altitudeDeg,
+      sunrise:     formatTime(times.sunrise),
+      sunset:      formatTime(times.sunset),
       bestWindow,
+      currentHour: now.getHours(),
     });
   }, [lat, lng, weather, todayForecast]);
 
@@ -101,10 +105,13 @@ export default function WeatherDashboard({ lat, lng, weather, todayForecast }: P
             </div>
             <div className={`text-base font-black ${workerRisk.color}`}>{workerRisk.label}</div>
             <div className="text-xs text-muted-foreground mt-1 leading-snug">{workerRisk.advice}</div>
+            <div className="text-[10px] text-muted-foreground/60 mt-1.5">
+              Per NIOSH/OSHA heat stress guidelines
+            </div>
           </CardContent>
         </Card>
 
-        <Card className={`border-0 shadow-sm`}>
+        <Card className="border-0 shadow-sm">
           <CardContent className="pt-3 pb-3">
             <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">UV Index</div>
             <div className="flex items-center gap-2">
@@ -116,6 +123,11 @@ export default function WeatherDashboard({ lat, lng, weather, todayForecast }: P
             <div className="text-xs text-muted-foreground mt-1">
               Heat index: <span className="font-semibold">{Math.round(heatIndex)}°C</span>
             </div>
+            {weather.uvIndex === 0 && (
+              <div className="text-[10px] text-muted-foreground/70 mt-1 leading-snug">
+                UV is 0 outside daylight hours — normal
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -131,6 +143,22 @@ export default function WeatherDashboard({ lat, lng, weather, todayForecast }: P
           </CardContent>
         </Card>
       )}
+
+      {/* Hourly timeline */}
+      {todayHourly.length > 0 && sunData && (
+        <Card className="border-0 shadow-sm">
+          <CardContent className="pt-3 pb-3">
+            <HourlyTimeline hourly={todayHourly} currentHour={sunData.currentHour} />
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Data sources */}
+      <div className="text-[10px] text-muted-foreground/60 px-1 leading-relaxed space-y-0.5">
+        <div>Weather: <a href="https://open-meteo.com" target="_blank" rel="noopener" className="underline">Open-Meteo.com</a> (free & open-source, CC BY 4.0)</div>
+        <div>Heat index: Steadman (1979) formula, as used by NOAA/NWS</div>
+        <div>Solar position: SunCalc library (Vladimir Agafonkin)</div>
+      </div>
     </div>
   );
 }

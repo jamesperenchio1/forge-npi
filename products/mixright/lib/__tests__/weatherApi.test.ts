@@ -11,14 +11,15 @@ function makeApiResponse(overrides: Record<string, unknown> = {}) {
     },
     daily: {
       time: ["2026-03-28", "2026-03-29"],
-      temperature_2m_max:      [34.0, 32.5],
-      temperature_2m_min:      [24.0, 23.1],
+      temperature_2m_max:       [34.0, 32.5],
+      temperature_2m_min:       [24.0, 23.1],
       relative_humidity_2m_max: [88,   82],
-      precipitation_sum:       [0.0,  1.4],
-      weathercode:             [0,    61],
-      wind_speed_10m_max:      [22,   30],
-      uv_index_max:            [8.4,  6.0],
+      precipitation_sum:        [0.0,  1.4],
+      weathercode:              [0,    61],
+      wind_speed_10m_max:       [22,   30],
+      uv_index_max:             [8.4,  6.0],
     },
+    // hourly is optional — omitting it should produce an empty todayHourly array
     ...overrides,
   };
 }
@@ -128,5 +129,39 @@ describe("fetchWeather", () => {
     vi.mocked(fetch).mockRejectedValueOnce(new Error("Network error"));
 
     await expect(fetchWeather(0, 0)).rejects.toThrow("Network error");
+  });
+
+  it("returns empty todayHourly when hourly key is absent from response", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce({
+      ok: true,
+      json: async () => makeApiResponse(), // no hourly key
+    } as Response);
+
+    const result = await fetchWeather(0, 0);
+    expect(result.todayHourly).toEqual([]);
+  });
+
+  it("parses todayHourly when hourly data is present", async () => {
+    const withHourly = makeApiResponse({
+      hourly: {
+        time:                  ["2026-03-28T06:00", "2026-03-28T12:00"],
+        temperature_2m:        [28.5, 35.1],
+        relative_humidity_2m:  [80,   60],
+        wind_speed_10m:        [10,   18],
+        uv_index:              [2.0,  9.5],
+      },
+    });
+
+    vi.mocked(fetch).mockResolvedValueOnce({
+      ok: true,
+      json: async () => withHourly,
+    } as Response);
+
+    const result = await fetchWeather(0, 0);
+    expect(result.todayHourly).toHaveLength(2);
+    expect(result.todayHourly[0].hour).toBe(6);
+    expect(result.todayHourly[0].tempC).toBe(28.5);
+    expect(result.todayHourly[1].uvIndex).toBe(9.5);
+    expect(result.todayHourly[1].time).toBe("12:00");
   });
 });

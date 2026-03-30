@@ -16,14 +16,27 @@ export interface ForecastDay {
   uvIndexMax: number;
 }
 
+// One hourly data point for the intraday timeline.
+// UV index is 0 at night — this is correct; solar UV only exists during daylight.
+// Source: Open-Meteo hourly variables — open-meteo.com/en/docs
+export interface HourlyPoint {
+  time: string;       // "HH:00"
+  hour: number;       // 0–23
+  tempC: number;
+  humidityPct: number;
+  windKph: number;
+  uvIndex: number;
+}
+
 export interface WeatherResponse {
   current: CurrentWeather;
   forecast: ForecastDay[];
+  todayHourly: HourlyPoint[];  // 24 points for today; empty if unavailable
 }
 
 export async function fetchWeather(lat: number, lng: number): Promise<WeatherResponse> {
   const url = new URL("https://api.open-meteo.com/v1/forecast");
-  url.searchParams.set("latitude", lat.toFixed(4));
+  url.searchParams.set("latitude",  lat.toFixed(4));
   url.searchParams.set("longitude", lng.toFixed(4));
   url.searchParams.set("current", "temperature_2m,relative_humidity_2m,wind_speed_10m,uv_index");
   url.searchParams.set("daily", [
@@ -35,8 +48,15 @@ export async function fetchWeather(lat: number, lng: number): Promise<WeatherRes
     "wind_speed_10m_max",
     "uv_index_max",
   ].join(","));
-  url.searchParams.set("timezone", "auto");
+  url.searchParams.set("hourly", [
+    "temperature_2m",
+    "relative_humidity_2m",
+    "wind_speed_10m",
+    "uv_index",
+  ].join(","));
+  url.searchParams.set("timezone",      "auto");
   url.searchParams.set("forecast_days", "7");
+  url.searchParams.set("forecast_hours", "24");  // only today's 24 hours for hourly
 
   const res = await fetch(url.toString(), { signal: AbortSignal.timeout(10000) });
   if (!res.ok) throw new Error(`Open-Meteo error: ${res.status}`);
@@ -61,5 +81,21 @@ export async function fetchWeather(lat: number, lng: number): Promise<WeatherRes
     uvIndexMax:  Math.round(data.daily.uv_index_max[i] * 10) / 10,
   }));
 
-  return { current, forecast };
+  // Parse today's 24-hour breakdown (may be absent in mock/offline mode)
+  let todayHourly: HourlyPoint[] = [];
+  if (data.hourly?.time) {
+    todayHourly = (data.hourly.time as string[]).map((iso: string, i: number) => {
+      const hour = new Date(iso).getHours();
+      return {
+        time: `${String(hour).padStart(2, "0")}:00`,
+        hour,
+        tempC:       Math.round(data.hourly.temperature_2m[i] * 10) / 10,
+        humidityPct: Math.round(data.hourly.relative_humidity_2m[i]),
+        windKph:     Math.round(data.hourly.wind_speed_10m[i]),
+        uvIndex:     Math.round(data.hourly.uv_index[i] * 10) / 10,
+      };
+    });
+  }
+
+  return { current, forecast, todayHourly };
 }

@@ -131,12 +131,22 @@ describe("getWorkerRisk", () => {
     expect(getWorkerRisk(50).level).toBe("extreme");
   });
 
-  it("all risk levels include non-empty advice", () => {
+  it("all risk levels include non-empty advice and color", () => {
     [20, 28, 35, 42, 48].forEach(temp => {
       const r = getWorkerRisk(temp);
       expect(r.advice.length).toBeGreaterThan(0);
       expect(r.color.length).toBeGreaterThan(0);
     });
+  });
+
+  it("high risk advice mentions working in pairs or buddy system", () => {
+    const r = getWorkerRisk(36);
+    expect(r.advice.toLowerCase()).toMatch(/pair|together|alone/);
+  });
+
+  it("extreme risk advice recommends stopping or rescheduling", () => {
+    const r = getWorkerRisk(50);
+    expect(r.advice.toLowerCase()).toMatch(/stop|reschedule|not perform/);
   });
 });
 

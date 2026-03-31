@@ -68,9 +68,12 @@ Next.js + shadcn/ui + Tailwind + Supabase + Vercel. Mobile-first. No two product
 5. Would someone open this URL weekly?
 
 ## Industry Rotation Tracker
-Covered: (none yet)
-Next up: Construction → Concrete → Hand-mixing in rural SEA
-Queue: Agriculture, Aquaculture, Maritime, Mining, Waste Management, Wildlife, Religion, Insurance, Pharmaceuticals, Space...
+Covered:
+- Construction → MixRight (hand-mixed concrete in rural SEA) — built, shipped
+- Agriculture → GreenDeck (Thailand plant care OS for serious collectors) — build in progress
+
+Next up: Aquaculture
+Queue: Maritime, Mining, Waste Management, Wildlife, Religion, Insurance, Pharmaceuticals, Space...
 
 ## Inter-Agent Comms
 Log to `office/comms.jsonl`:

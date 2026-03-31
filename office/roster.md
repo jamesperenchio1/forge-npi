@@ -4,7 +4,7 @@
 |-------|------|--------|-------------|
 | The Director | `.claude/agents/director.md` | ACTIVE | GreenDeck — research phase |
 | Research Scout | `.claude/agents/scout.md` | ACTIVE | Research complete for thailand-plant-garden |
-| Problem Validator | `.claude/agents/validator.md` | IDLE | Awaiting thailand-plant-garden brief |
+| Problem Validator | `.claude/agents/validator.md` | IDLE | Validation complete — PASS (GreenDeck) |
 | API Hunter | `.claude/agents/api-hunter.md` | IDLE | MixRight APIs documented |
 | System Architect | `.claude/agents/architect.md` | IDLE | MixRight architecture complete |
 | Dev Expert | `.claude/agents/dev.md` | IDLE | MixRight build complete |

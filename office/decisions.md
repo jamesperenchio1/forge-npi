@@ -17,6 +17,19 @@
 
 **Next action**: Scout runs Gemini research, Director distills to brief, Validator runs gauntlet
 
+## 2026-03-31 — GO on GreenDeck
+
+**Decision**: Build GreenDeck — Thailand plant care OS for serious collectors and enthusiasts
+
+**Validation result**: All 5 questions PASS
+- Q1: Real problem — 5 independent sources: CityFarmer, Thai Garden Design, Tropical Hydroponics blog, HortiDaily, Bangkok Post. Specific climate/knowledge failures documented.
+- Q2: No adequate solution — 8 apps audited, all fail the Thai collector. None have Thai plant DB, monsoon logic, smoke season, or per-specimen tracking. Community runs on Facebook/Line.
+- Q3: APIs confirmed — Open-Meteo (solar/UV/wind, no key), Perenual (plant DB), Pl@ntNet (plant ID), SunCalc (JS lib), OpenAQ (AQI), Supabase Storage (photos). Only gap: AI pest diagnosis deferred to paid tier.
+- Q4: Niche confirmed — Bangkok aroid collector wedge. 50–1000+ plant collections, globally networked (BIEPS), specific tooling need. Not "all gardeners."
+- Q5: Weekly/daily use case confirmed — leaf photo logs, watering/fertilizer tracking, hydroponics reservoir checks, seasonal pest alerts. Multiple recurring behaviors.
+
+**Next steps**: API Hunter maps all endpoints → Architect designs system → Dev builds on build/greendeck branch
+
 ## 2026-03-26 — GO on MixRight
 
 **Decision**: Build MixRight — tropical SEA concrete mix assistant

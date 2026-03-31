@@ -6,16 +6,16 @@ New Product Innovation office. Research hyper-niche real problems, validate them
 **The Director** — opinionated NPI studio operator. Not a chatbot. Ship weird but genuinely useful products. Validate before you build. Be specific or be quiet.
 
 ## Agent Loading Policy
-**LAZY LOAD ONLY.** Do not pre-spawn agents. Create agent files only when the pipeline reaches their stage:
+**LAZY LOAD ONLY.** All agent definitions live in `.claude/agents/`. Do not invoke an agent before the pipeline reaches its stage:
 - `director.md` — always active
-- `scout.md` — spawn at research cycle start
-- `validator.md` — spawn when validating
-- `api-hunter.md` — spawn when validation needs API mapping
-- `architect.md` — spawn when build starts
-- `dev.md` — spawn when build starts
-- `content-goblin.md` — spawn at ship stage
+- `scout.md` — invoke at research cycle start
+- `validator.md` — invoke when validating
+- `api-hunter.md` — invoke when validation needs API mapping
+- `architect.md` — invoke when build starts
+- `dev.md` — invoke when build starts
+- `content-goblin.md` — invoke at ship stage
 
-When spawning: (1) write the .md file, (2) add to `office/roster.md`, (3) log to `office/comms.jsonl`.
+When activating an agent: (1) add/update entry in `office/roster.md`, (2) log to `office/comms.jsonl`.
 
 ## Traffic Flow
 ```
@@ -54,11 +54,37 @@ Free APIs only. Vercel free tier. Supabase free tier. $0/month to operate.
 ## Dev Stack
 Next.js + shadcn/ui + Tailwind + Supabase + Vercel. Mobile-first. No two products look the same. Working prototype — real API calls, real data.
 
-## Backlog Files (append-only JSONL)
-- `backlog/ideas.jsonl` — all ideas ever considered
-- `backlog/validated.jsonl` — passed 5-question gauntlet
-- `backlog/rejected.jsonl` — failed (with reason)
-- `backlog/shipped.jsonl` — live products
+## Directory Map
+```
+backlog/          — append-only JSONL state files
+  ideas.jsonl     — all ideas ever considered
+  validated.jsonl — passed 5-question gauntlet
+  rejected.jsonl  — failed (with reason)
+  shipped.jsonl   — live products
+
+research/[slug]/  — one folder per idea
+  brief.md        — Director's distilled brief (500 words max)
+  validation.md   — 5-question gauntlet results
+  raw/            — Gemini dumps; NEVER load into Claude context
+    gemini-output.md  — always use this filename (not scout-output.md)
+
+products/[slug]/  — built product code (Next.js app)
+  architecture.md — tech stack, API map, component tree
+  src/            — application source
+
+content/[slug]/   — video & marketing assets
+  video-script.md
+  hooks.md
+  shot-list.md
+  thumbnail-brief.md
+
+office/
+  roster.md       — active agents + status
+  decisions.md    — decision log with rationale
+  comms.jsonl     — inter-agent communication log
+```
+
+**vercel.json** at repo root is hardcoded to the current active product. Update `build.command` and `outputDirectory` when shipping a new product.
 
 ## Validation Gauntlet (all 5 must pass)
 1. Is this actually a problem? (3+ independent real sources)
@@ -68,9 +94,9 @@ Next.js + shadcn/ui + Tailwind + Supabase + Vercel. Mobile-first. No two product
 5. Would someone open this URL weekly?
 
 ## Industry Rotation Tracker
-Covered: (none yet)
-Next up: Construction → Concrete → Hand-mixing in rural SEA
-Queue: Agriculture, Aquaculture, Maritime, Mining, Waste Management, Wildlife, Religion, Insurance, Pharmaceuticals, Space...
+Covered: Construction (MixRight — concrete hand-mixing SEA, build complete)
+In Progress: Agriculture (GreenDeck — Thailand plant care OS, build in progress)
+Queue: Aquaculture, Maritime, Mining, Waste Management, Wildlife, Religion, Insurance, Pharmaceuticals, Space...
 
 ## Inter-Agent Comms
 Log to `office/comms.jsonl`:

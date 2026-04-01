@@ -1,65 +1,87 @@
-// Core domain types for GreenDeck
-
-export type User = {
+// Core plant type stored in localStorage
+export type LocalPlant = {
   id: string;
-  email: string;
-  created_at: string;
-};
-
-export type Garden = {
-  id: string;
-  user_id: string;
-  name: string;
-  lat: number;
-  lon: number;
-  created_at: string;
-};
-
-export type Container = {
-  id: string;
-  garden_id: string;
-  name: string;
-  type: "pot" | "raised-bed" | "grow-bag" | "hydroponics" | "in-ground";
-  width_cm: number;
-  depth_cm: number;
-  x: number; // canvas position
-  y: number;
-};
-
-export type Plant = {
-  id: string;
-  container_id: string;
+  collector_tag: string;
   common_name: string;
   scientific_name?: string;
-  planted_at: string;
+  health_status: 'healthy' | 'watch' | 'sick' | 'dormant';
+  growing_system: 'soil' | 'kratky' | 'nft' | 'dwc' | 'semi_hydro';
+  stage: 'seed' | 'seedling' | 'juvenile' | 'established' | 'specimen';
   notes?: string;
-  perenual_id?: number;
+  added_at: string;
+  cover_emoji?: string;
+  // Gemini-fetched details
+  watering_needs?: string;
+  sunlight_needs?: string;
+  care_level?: string;
+  description?: string;
+  gemini_details_fetched?: boolean;
 };
 
-export type PlantPhoto = {
+// Care log entry
+export type CareLog = {
   id: string;
   plant_id: string;
-  url: string;
-  taken_at: string;
+  type: 'watered' | 'fertilized' | 'repotted' | 'pruned' | 'treated' | 'observation' | 'harvest' | 'noted';
   notes?: string;
+  timestamp: string;
 };
 
-export type HydroSystem = {
+// Doctor consultation log
+export type DoctorLog = {
   id: string;
-  garden_id: string;
-  name: string;
-  type: "NFT" | "DWC" | "Kratky" | "Ebb-and-Flow" | "Wicking";
-  channels: number;
-  nutrients_ppm?: number;
-  ph?: number;
-  last_checked?: string;
+  plant_id?: string;
+  plant_name: string;
+  condition: string;
+  confidence: 'high' | 'medium' | 'low';
+  severity: 'none' | 'mild' | 'moderate' | 'severe';
+  urgency: 'monitor' | 'act_this_week' | 'act_today' | 'emergency';
+  symptoms_observed: string[];
+  likely_cause: string;
+  treatment_steps: { step: number; action: string; product?: string }[];
+  prevention: string;
+  seasonal_note?: string;
+  timestamp: string;
+  resolved: boolean;
+  follow_up_notes?: string;
+  image_preview?: string; // base64 thumbnail
 };
 
-export type WeatherSnapshot = {
-  lat: number;
-  lon: number;
-  temp_c: number;
-  humidity_pct: number;
-  wind_kmh: number;
-  fetched_at: string;
+// Container/pot in garden
+export type Container = {
+  id: string;
+  name: string;
+  x: number; // % position
+  y: number;
+  w: number; // % dimensions
+  h: number;
+  color: string;
+  plantIds: string[];
+  zone_id?: string;
+  sections: PotSection[];
+};
+
+// A section within a pot (dividing it up)
+export type PotSection = {
+  id: string;
+  label: string;
+  plant_id?: string;
+};
+
+// Garden zone grouping containers
+export type Zone = {
+  id: string;
+  name: string;
+  color: string;
+};
+
+// Calendar event for planting schedule
+export type CalendarEvent = {
+  id: string;
+  date: string; // ISO date string YYYY-MM-DD
+  type: 'plant' | 'harvest' | 'fertilize' | 'water' | 'treat' | 'observe' | 'custom';
+  plant_id?: string;
+  plant_name: string;
+  notes?: string;
+  color?: string;
 };

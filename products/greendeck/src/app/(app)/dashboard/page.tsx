@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { WeatherData, weatherCodeLabel, uvLabel } from "@/lib/openmeteo";
+import { WeatherData, weatherCodeLabel, uvLabel, uvColor } from "@/lib/openmeteo";
 import { getPestsForMonth } from "@/lib/pest-calendar";
 import Link from "next/link";
 
@@ -79,8 +79,8 @@ export default function DashboardPage() {
             <div className="text-right">
               <p className="text-sm opacity-80">UV Index</p>
               <p className="text-2xl font-semibold">{weather.current.uv_index.toFixed(1)}</p>
-              <p className={`text-xs font-medium ${uvLabel(weather.current.uv_index).color.replace("text-", "text-")} opacity-90`}>
-                {uvLabel(weather.current.uv_index).label}
+              <p className={`text-xs font-medium ${uvColor(weather.current.uv_index)} opacity-90`}>
+                {uvLabel(weather.current.uv_index)}
               </p>
             </div>
           </div>

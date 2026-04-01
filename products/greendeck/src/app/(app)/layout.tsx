@@ -50,6 +50,17 @@ const NAV = [
     ),
   },
   {
+    href: "/calendar",
+    label: "Calendar",
+    icon: (active: boolean) => (
+      <svg viewBox="0 0 24 24" fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth={active ? 0 : 1.8} className="w-6 h-6">
+        <rect x="3" y="4" width="18" height="18" rx="2" strokeLinecap="round" strokeLinejoin="round"/>
+        <path d="M16 2v4M8 2v4M3 10h18" strokeLinecap="round" strokeLinejoin="round"/>
+        <path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}/>
+      </svg>
+    ),
+  },
+  {
     href: "/weather",
     label: "Climate",
     icon: (active: boolean) => (

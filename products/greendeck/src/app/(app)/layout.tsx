@@ -70,6 +70,16 @@ const NAV = [
       </svg>
     ),
   },
+  {
+    href: "/hydroponics",
+    label: "Hydro",
+    icon: (active: boolean) => (
+      <svg viewBox="0 0 24 24" fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth={active ? 0 : 1.8} className="w-6 h-6">
+        <path d="M12 2C12 2 6 9 6 14a6 6 0 0 0 12 0C18 9 12 2 12 2z" strokeLinecap="round" strokeLinejoin="round"/>
+        <path d="M9 14c0 1.66 1.34 3 3 3" strokeLinecap="round"/>
+      </svg>
+    ),
+  },
 ];
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {

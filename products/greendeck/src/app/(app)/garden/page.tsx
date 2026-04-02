@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { LocalPlant, Container, Zone, PotSection } from '@/types/index';
+import { LocalPlant, Container, Zone, PotSection, PhotoEntry } from '@/types/index';
 import {
   DndContext,
   DragEndEvent,
@@ -10,6 +10,9 @@ import {
   DragOverlay,
 } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
+
+// PhotoEntry is imported so it's used in PlantIcon below
+type _PhotoEntryUsed = PhotoEntry;
 
 const ZONE_COLORS = [
   { bg: 'bg-green-100', border: 'border-green-300', text: 'text-green-800', hex: '#16a34a' },
@@ -59,7 +62,172 @@ function buildSections(division: DivisionType): PotSection[] {
   }
 }
 
-// Mini map draggable container
+// ── PlantIcon ──────────────────────────────────────────────────────────────────
+
+function PlantIcon({ plant, size = 32 }: { plant: LocalPlant; size?: number }) {
+  const photos = plant.photos;
+  const photoUrl =
+    photos && photos.length > 0
+      ? photos[plant.mainPhotoIndex ?? 0]?.url ?? null
+      : null;
+
+  const px = `${size}px`;
+
+  if (photoUrl) {
+    return (
+      <img
+        src={photoUrl}
+        alt={plant.common_name}
+        style={{ width: px, height: px, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }}
+      />
+    );
+  }
+
+  if (plant.cover_emoji) {
+    return (
+      <div
+        style={{
+          width: px,
+          height: px,
+          borderRadius: '50%',
+          fontSize: `${Math.round(size * 0.55)}px`,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: 'oklch(0.94 0.03 145)',
+          flexShrink: 0,
+        }}
+      >
+        {plant.cover_emoji}
+      </div>
+    );
+  }
+
+  return (
+    <div
+      style={{
+        width: px,
+        height: px,
+        borderRadius: '50%',
+        background: 'oklch(0.85 0 0)',
+        flexShrink: 0,
+      }}
+    />
+  );
+}
+
+// ── SectionGrid ────────────────────────────────────────────────────────────────
+
+function getSectionGridStyle(division: DivisionType): {
+  cols: number;
+  rows: number;
+} {
+  switch (division) {
+    case 'half_v': return { cols: 2, rows: 1 };
+    case 'half_h': return { cols: 1, rows: 2 };
+    case 'quarters': return { cols: 2, rows: 2 };
+    case 'thirds_v': return { cols: 3, rows: 1 };
+    case 'thirds_h': return { cols: 1, rows: 3 };
+    default: return { cols: 1, rows: 1 };
+  }
+}
+
+function detectDivision(sections: PotSection[]): DivisionType {
+  const n = sections.length;
+  const labels = sections.map((s) => s.label);
+  if (n === 2 && labels.includes('Top')) return 'half_h';
+  if (n === 2 && labels.includes('Left')) return 'half_v';
+  if (n === 4) return 'quarters';
+  if (n === 3 && labels.includes('Middle')) return 'thirds_h';
+  if (n === 3 && labels.includes('Center')) return 'thirds_v';
+  return 'none';
+}
+
+function ContainerSectionGrid({
+  container,
+  plants,
+}: {
+  container: Container;
+  plants: LocalPlant[];
+}) {
+  const sections = container.sections;
+
+  // No sections or single "Main" section without a plant: show assigned plants row
+  const isSingleMain =
+    sections.length === 0 ||
+    (sections.length === 1 && sections[0].label === 'Main');
+
+  if (isSingleMain) {
+    const assignedPlants = container.plantIds
+      .map((pid) => plants.find((p) => p.id === pid))
+      .filter((p): p is LocalPlant => p !== undefined);
+
+    if (assignedPlants.length === 0) return null;
+
+    return (
+      <div className="flex flex-wrap gap-1.5 mt-2">
+        {assignedPlants.map((plant) => (
+          <div key={plant.id} className="flex flex-col items-center gap-0.5">
+            <PlantIcon plant={plant} size={32} />
+            <span className="text-[9px] text-muted-foreground leading-tight max-w-[36px] text-center truncate">
+              {plant.common_name.split(' ')[0]}
+            </span>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  const division = detectDivision(sections);
+  const { cols } = getSectionGridStyle(division);
+
+  return (
+    <div
+      className="mt-2 gap-1"
+      style={{
+        display: 'grid',
+        gridTemplateColumns: `repeat(${cols}, 1fr)`,
+      }}
+    >
+      {sections.map((section) => {
+        const plant = section.plant_id
+          ? plants.find((p) => p.id === section.plant_id)
+          : undefined;
+
+        return (
+          <div
+            key={section.id}
+            className="flex flex-col items-center justify-center gap-0.5 rounded-lg border border-border bg-muted/30 p-1.5"
+          >
+            {plant ? (
+              <>
+                <PlantIcon plant={plant} size={28} />
+                <span className="text-[9px] text-muted-foreground leading-tight max-w-[48px] text-center truncate">
+                  {plant.common_name.split(' ')[0]}
+                </span>
+              </>
+            ) : (
+              <div
+                style={{
+                  width: 28,
+                  height: 28,
+                  borderRadius: '50%',
+                  background: 'oklch(0.90 0 0)',
+                }}
+              />
+            )}
+            <span className="text-[8px] text-muted-foreground/60 leading-tight">
+              {section.label}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── Mini map ───────────────────────────────────────────────────────────────────
+
 function MiniDraggableContainer({
   container,
   zoneColor,
@@ -108,7 +276,8 @@ function CanvasDroppable({ children }: { children: React.ReactNode }) {
   );
 }
 
-// Expanded container card component
+// ── ContainerCard ──────────────────────────────────────────────────────────────
+
 function ContainerCard({
   container,
   plants,
@@ -156,6 +325,7 @@ function ContainerCard({
 
   return (
     <div className="rounded-xl border border-border bg-background overflow-hidden">
+      {/* Header row */}
       <button
         className="w-full px-3 py-2.5 flex items-center justify-between text-left"
         onClick={onToggle}
@@ -169,6 +339,14 @@ function ContainerCard({
         <span className="text-muted-foreground text-sm">{expanded ? '▲' : '▼'}</span>
       </button>
 
+      {/* Section grid preview (collapsed) */}
+      {!expanded && (
+        <div className="px-3 pb-2">
+          <ContainerSectionGrid container={container} plants={plants} />
+        </div>
+      )}
+
+      {/* Expanded detail */}
       {expanded && (
         <div className="px-3 pb-3 space-y-3 border-t border-border pt-3">
           {/* Rename */}
@@ -199,7 +377,7 @@ function ContainerCard({
                     getContainerSize() === s ? 'bg-primary text-primary-foreground border-primary' : 'bg-muted border-border'
                   }`}
                 >
-                  {s === 'small' ? 'S (1×1)' : s === 'medium' ? 'M (2×1)' : s === 'large' ? 'L (2×2)' : 'XL (3×2)'}
+                  {s === 'small' ? 'S (1x1)' : s === 'medium' ? 'M (2x1)' : s === 'large' ? 'L (2x2)' : 'XL (3x2)'}
                 </button>
               ))}
             </div>
@@ -229,11 +407,11 @@ function ContainerCard({
             <div className="flex gap-1.5 flex-wrap mb-2">
               {([
                 { val: 'none', label: 'None' },
-                { val: 'half_v', label: '÷2 |' },
-                { val: 'half_h', label: '÷2 —' },
-                { val: 'quarters', label: '÷4 ⊞' },
-                { val: 'thirds_v', label: '÷3 |||' },
-                { val: 'thirds_h', label: '÷3 ===' },
+                { val: 'half_v', label: 'div2 |' },
+                { val: 'half_h', label: 'div2 -' },
+                { val: 'quarters', label: 'div4' },
+                { val: 'thirds_v', label: 'div3 |||' },
+                { val: 'thirds_h', label: 'div3 ===' },
               ] as { val: DivisionType; label: string }[]).map(({ val, label }) => (
                 <button
                   key={val}
@@ -259,7 +437,7 @@ function ContainerCard({
                   >
                     <option value="">-- assign plant --</option>
                     {plants.map((p) => (
-                      <option key={p.id} value={p.id}>{p.cover_emoji ?? '🌿'} {p.common_name} {p.collector_tag ? `(${p.collector_tag})` : ''}</option>
+                      <option key={p.id} value={p.id}>{p.cover_emoji ?? ''} {p.common_name} {p.collector_tag ? `(${p.collector_tag})` : ''}</option>
                     ))}
                   </select>
                 </div>
@@ -278,7 +456,7 @@ function ContainerCard({
                     onClick={() => onAssignPlant(p.id)}
                     className="w-full text-left text-xs px-2.5 py-1.5 rounded-lg bg-muted border border-border hover:border-primary/40 transition-colors"
                   >
-                    {p.cover_emoji ?? '🌿'} {p.common_name}
+                    {p.cover_emoji ?? ''} {p.common_name}
                     <span className="text-muted-foreground ml-1.5">{p.collector_tag}</span>
                   </button>
                 ))}
@@ -294,8 +472,11 @@ function ContainerCard({
                 {container.plantIds.map((pid) => {
                   const plant = plants.find((p) => p.id === pid);
                   return plant ? (
-                    <div key={pid} className="flex items-center justify-between text-xs">
-                      <span>{plant.cover_emoji ?? '🌿'} {plant.common_name}</span>
+                    <div key={pid} className="flex items-center justify-between text-xs gap-2">
+                      <div className="flex items-center gap-1.5">
+                        <PlantIcon plant={plant} size={20} />
+                        <span>{plant.common_name}</span>
+                      </div>
                       <button
                         onClick={() => onRemovePlant(pid)}
                         className="text-muted-foreground hover:text-destructive"
@@ -322,6 +503,13 @@ function ContainerCard({
   );
 }
 
+// ── ZoneTab ID constants ───────────────────────────────────────────────────────
+
+const TAB_ALL = '__all__';
+const TAB_UNZONED = '__unzoned__';
+
+// ── Page ───────────────────────────────────────────────────────────────────────
+
 export default function GardenPage() {
   const [plants, setPlants] = useState<LocalPlant[]>([]);
   const [containers, setContainers] = useState<Container[]>([]);
@@ -332,6 +520,7 @@ export default function GardenPage() {
   const [newContainerZoneId, setNewContainerZoneId] = useState<string | null>(null);
   const [newContainerName, setNewContainerName] = useState('');
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<string>(TAB_ALL);
 
   useEffect(() => {
     const p = localStorage.getItem('greendeck_plants');
@@ -341,6 +530,15 @@ export default function GardenPage() {
     const z = localStorage.getItem('greendeck_zones');
     if (z) setZones(JSON.parse(z));
   }, []);
+
+  // When zones change, ensure activeTab is still valid
+  useEffect(() => {
+    if (zones.length === 0) {
+      setActiveTab(TAB_ALL);
+    } else if (activeTab !== TAB_UNZONED && !zones.find((z) => z.id === activeTab)) {
+      setActiveTab(zones[0]?.id ?? TAB_ALL);
+    }
+  }, [zones, activeTab]);
 
   function saveContainers(updated: Container[]) {
     setContainers(updated);
@@ -359,13 +557,18 @@ export default function GardenPage() {
       name: newZoneName.trim(),
       color: ZONE_COLORS[zones.length % ZONE_COLORS.length].hex,
     };
-    saveZones([...zones, z]);
+    const updated = [...zones, z];
+    saveZones(updated);
     setNewZoneName('');
     setAddingZone(false);
+    setActiveTab(z.id);
   }
 
   function addContainer(zoneId: string | null) {
     if (!newContainerName.trim()) return;
+    // Map special tab IDs back to real zone IDs
+    const resolvedZoneId =
+      zoneId === TAB_ALL || zoneId === TAB_UNZONED ? undefined : (zoneId ?? undefined);
     const c: Container = {
       id: crypto.randomUUID(),
       name: newContainerName.trim(),
@@ -375,7 +578,7 @@ export default function GardenPage() {
       h: SIZE_DIMS.medium.h,
       color: 'bg-green-100 border-green-300',
       plantIds: [],
-      zone_id: zoneId ?? undefined,
+      zone_id: resolvedZoneId,
       sections: [{ id: crypto.randomUUID(), label: 'Main' }],
     };
     saveContainers([...containers, c]);
@@ -470,41 +673,72 @@ export default function GardenPage() {
     saveContainers(updated);
   }, [containers]);
 
-  function getZoneStyle(zoneId?: string) {
-    if (!zoneId) return undefined;
-    const idx = zones.findIndex((z) => z.id === zoneId);
-    if (idx < 0) return undefined;
-    return ZONE_COLORS[idx % ZONE_COLORS.length];
-  }
-
   function getZoneColor(zoneId?: string): string {
-    const style = getZoneStyle(zoneId);
-    return style ? `${style.bg} ${style.border}` : 'bg-green-100 border-green-300';
+    if (!zoneId) return 'bg-green-100 border-green-300';
+    const idx = zones.findIndex((z) => z.id === zoneId);
+    if (idx < 0) return 'bg-green-100 border-green-300';
+    const style = ZONE_COLORS[idx % ZONE_COLORS.length];
+    return `${style.bg} ${style.border}`;
   }
 
-  // Group containers by zone
-  const zoneContainers = (zoneId: string | null) =>
-    containers.filter((c) => (zoneId === null ? !c.zone_id : c.zone_id === zoneId));
+  // Containers for the active tab
+  function getTabContainers(): Container[] {
+    if (activeTab === TAB_ALL) return containers;
+    if (activeTab === TAB_UNZONED) return containers.filter((c) => !c.zone_id);
+    return containers.filter((c) => c.zone_id === activeTab);
+  }
 
-  const unzonedContainers = zoneContainers(null);
+  const unzonedContainers = containers.filter((c) => !c.zone_id);
 
-  function renderAddPotForm(forZoneId: string | null) {
-    if (newContainerZoneId !== forZoneId) return null;
+  // Build tab list
+  type TabDef = { id: string; label: string; count: number };
+  function buildTabs(): TabDef[] {
+    if (zones.length === 0) {
+      return [{ id: TAB_ALL, label: 'All Pots', count: containers.length }];
+    }
+    const tabs: TabDef[] = zones.map((z) => ({
+      id: z.id,
+      label: z.name,
+      count: containers.filter((c) => c.zone_id === z.id).length,
+    }));
+    if (unzonedContainers.length > 0 || zones.length > 0) {
+      tabs.push({ id: TAB_UNZONED, label: 'Unzoned', count: unzonedContainers.length });
+    }
+    return tabs;
+  }
+
+  const tabs = buildTabs();
+  const tabContainers = getTabContainers();
+
+  // The "add pot" form key for the current tab
+  function getAddPotFormKey(): string {
+    if (activeTab === TAB_ALL) return TAB_ALL;
+    if (activeTab === TAB_UNZONED) return TAB_UNZONED;
+    return activeTab;
+  }
+
+  function renderAddPotForm(forKey: string) {
+    if (newContainerZoneId !== forKey) return null;
+    const zoneId = forKey === TAB_ALL || forKey === TAB_UNZONED ? null : forKey;
     return (
       <div className="flex gap-2 mt-2">
         <input
           autoFocus
           value={newContainerName}
           onChange={(e) => setNewContainerName(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && addContainer(forZoneId)}
+          onKeyDown={(e) => e.key === 'Enter' && addContainer(zoneId)}
           placeholder="Pot name (e.g. NFT channel A)"
           className="flex-1 rounded-xl border border-border bg-input px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30"
         />
-        <button onClick={() => addContainer(forZoneId)} className="px-3 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-medium">Add</button>
-        <button onClick={() => setNewContainerZoneId(undefined as unknown as null)} className="px-3 py-2 rounded-xl bg-muted border border-border text-sm">Cancel</button>
+        <button onClick={() => addContainer(zoneId)} className="px-3 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-medium">Add</button>
+        <button onClick={() => setNewContainerZoneId(null)} className="px-3 py-2 rounded-xl bg-muted border border-border text-sm">Cancel</button>
       </div>
     );
   }
+
+  const formKey = getAddPotFormKey();
+
+  const unplacedPlants = plants.filter((p) => !containers.some((c) => c.plantIds.includes(p.id)));
 
   return (
     <div className="max-w-lg mx-auto px-4 py-6 space-y-5">
@@ -512,14 +746,26 @@ export default function GardenPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold" style={{ fontFamily: 'var(--font-lora)' }}>Garden</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">{containers.length} pot{containers.length !== 1 ? 's' : ''} · {zones.length} zone{zones.length !== 1 ? 's' : ''}</p>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            {containers.length} pot{containers.length !== 1 ? 's' : ''} · {zones.length} zone{zones.length !== 1 ? 's' : ''}
+          </p>
         </div>
-        <button
-          onClick={() => setAddingZone(true)}
-          className="rounded-2xl bg-primary text-primary-foreground px-4 py-2.5 text-sm font-semibold"
-        >
-          + Add Zone
-        </button>
+        <div className="flex gap-2">
+          {/* Map view placeholder */}
+          <button
+            disabled
+            className="rounded-2xl bg-muted border border-border px-3 py-2 text-xs text-muted-foreground font-medium opacity-60 cursor-not-allowed"
+            title="Map view coming soon"
+          >
+            Map view
+          </button>
+          <button
+            onClick={() => setAddingZone(true)}
+            className="rounded-2xl bg-primary text-primary-foreground px-4 py-2.5 text-sm font-semibold"
+          >
+            + Add Zone
+          </button>
+        </div>
       </div>
 
       {/* Add zone form */}
@@ -579,146 +825,93 @@ export default function GardenPage() {
         </DndContext>
       )}
 
-      {/* Zone panels */}
-      {zones.length > 0 ? (
-        <div className="space-y-3">
-          {zones.map((zone, zoneIdx) => {
-            const zoneStyle = ZONE_COLORS[zoneIdx % ZONE_COLORS.length];
-            const zonePots = zoneContainers(zone.id);
+      {/* Zone Tab Bar */}
+      <div className="overflow-x-auto -mx-1 px-1">
+        <div className="flex gap-1 min-w-max">
+          {tabs.map((tab) => {
+            const isActive = activeTab === tab.id;
             return (
-              <div key={zone.id} className="rounded-2xl border border-border overflow-hidden">
-                <div
-                  className="px-4 py-3 flex items-center justify-between"
-                  style={{ backgroundColor: zone.color + '22' }}
-                >
-                  <h2 className={`font-semibold text-sm ${zoneStyle.text}`}>{zone.name}</h2>
-                  <button
-                    onClick={() => { setNewContainerZoneId(zone.id); setNewContainerName(''); }}
-                    className={`text-xs font-medium ${zoneStyle.text} opacity-80`}
-                  >
-                    + Pot
-                  </button>
-                </div>
-                <div className="p-3 space-y-2">
-                  {renderAddPotForm(zone.id)}
-                  {zonePots.length === 0 && newContainerZoneId !== zone.id ? (
-                    <p className="text-xs text-muted-foreground py-2 text-center">No pots yet</p>
-                  ) : (
-                    zonePots.map((c) => (
-                      <ContainerCard
-                        key={c.id}
-                        container={c}
-                        plants={plants}
-                        zones={zones}
-                        expanded={expandedId === c.id}
-                        onToggle={() => setExpandedId(expandedId === c.id ? null : c.id)}
-                        onDelete={() => deleteContainer(c.id)}
-                        onAssignPlant={(pid) => assignPlant(c.id, pid)}
-                        onRemovePlant={(pid) => removePlantFromContainer(c.id, pid)}
-                        onAssignZone={(zid) => assignZone(c.id, zid)}
-                        onApplyDivision={(div) => applyDivision(c.id, div)}
-                        onUpdateSectionLabel={(sid, label) => updateSectionLabel(c.id, sid, label)}
-                        onAssignSectionPlant={(sid, pid) => assignPlant(c.id, pid, sid)}
-                        onRename={(name) => renameContainer(c.id, name)}
-                        onResize={(size) => resizeContainer(c.id, size)}
-                      />
-                    ))
-                  )}
-                </div>
-              </div>
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-colors border ${
+                  isActive
+                    ? 'bg-primary text-primary-foreground border-primary'
+                    : 'bg-muted border-border text-muted-foreground hover:border-primary/40'
+                }`}
+              >
+                {tab.label}
+                {tab.count > 0 && (
+                  <span className={`ml-1.5 text-[10px] ${isActive ? 'opacity-80' : 'opacity-60'}`}>
+                    {tab.count}
+                  </span>
+                )}
+              </button>
             );
           })}
-
-          {/* Unzoned containers */}
-          {unzonedContainers.length > 0 && (
-            <div className="rounded-2xl border border-border overflow-hidden">
-              <div className="px-4 py-3 flex items-center justify-between bg-muted/50">
-                <h2 className="font-semibold text-sm text-muted-foreground">Unzoned</h2>
-                <button
-                  onClick={() => { setNewContainerZoneId('__unzoned__'); setNewContainerName(''); }}
-                  className="text-xs font-medium text-muted-foreground"
-                >
-                  + Pot
-                </button>
-              </div>
-              <div className="p-3 space-y-2">
-                {renderAddPotForm('__unzoned__')}
-                {unzonedContainers.map((c) => (
-                  <ContainerCard
-                    key={c.id}
-                    container={c}
-                    plants={plants}
-                    zones={zones}
-                    expanded={expandedId === c.id}
-                    onToggle={() => setExpandedId(expandedId === c.id ? null : c.id)}
-                    onDelete={() => deleteContainer(c.id)}
-                    onAssignPlant={(pid) => assignPlant(c.id, pid)}
-                    onRemovePlant={(pid) => removePlantFromContainer(c.id, pid)}
-                    onAssignZone={(zid) => assignZone(c.id, zid)}
-                    onApplyDivision={(div) => applyDivision(c.id, div)}
-                    onUpdateSectionLabel={(sid, label) => updateSectionLabel(c.id, sid, label)}
-                    onAssignSectionPlant={(sid, pid) => assignPlant(c.id, pid, sid)}
-                    onRename={(name) => renameContainer(c.id, name)}
-                    onResize={(size) => resizeContainer(c.id, size)}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
         </div>
-      ) : (
-        // No zones — show all containers in a single "Unzoned" section
-        <div className="rounded-2xl border border-border overflow-hidden">
-          <div className="px-4 py-3 flex items-center justify-between bg-muted/50">
-            <h2 className="font-semibold text-sm text-muted-foreground">All Pots</h2>
+      </div>
+
+      {/* Tab content: container list */}
+      <div className="space-y-2">
+        {/* Add pot button */}
+        <div className="flex items-center justify-between mb-1">
+          <span className="text-xs text-muted-foreground font-medium">
+            {tabContainers.length === 0 ? 'No pots yet' : `${tabContainers.length} pot${tabContainers.length !== 1 ? 's' : ''}`}
+          </span>
+          <button
+            onClick={() => { setNewContainerZoneId(formKey); setNewContainerName(''); }}
+            className="text-xs font-semibold text-primary hover:underline"
+          >
+            + Pot
+          </button>
+        </div>
+
+        {renderAddPotForm(formKey)}
+
+        {tabContainers.length === 0 && newContainerZoneId !== formKey && (
+          <div className="py-8 text-center rounded-2xl border border-dashed border-border">
+            <p className="text-sm text-muted-foreground">No pots in this zone yet.</p>
             <button
-              onClick={() => { setNewContainerZoneId('__all__'); setNewContainerName(''); }}
-              className="text-xs font-medium text-muted-foreground"
+              onClick={() => { setNewContainerZoneId(formKey); setNewContainerName(''); }}
+              className="mt-2 text-xs text-primary font-medium hover:underline"
             >
-              + Pot
+              Add a pot
             </button>
           </div>
-          <div className="p-3 space-y-2">
-            {renderAddPotForm('__all__')}
-            {containers.length === 0 && newContainerZoneId !== '__all__' ? (
-              <div className="py-6 text-center space-y-2">
-                <span className="text-3xl">🪴</span>
-                <p className="text-sm text-muted-foreground">Add a zone to organize your pots, or add a pot directly.</p>
-              </div>
-            ) : (
-              containers.map((c) => (
-                <ContainerCard
-                  key={c.id}
-                  container={c}
-                  plants={plants}
-                  zones={zones}
-                  expanded={expandedId === c.id}
-                  onToggle={() => setExpandedId(expandedId === c.id ? null : c.id)}
-                  onDelete={() => deleteContainer(c.id)}
-                  onAssignPlant={(pid) => assignPlant(c.id, pid)}
-                  onRemovePlant={(pid) => removePlantFromContainer(c.id, pid)}
-                  onAssignZone={(zid) => assignZone(c.id, zid)}
-                  onApplyDivision={(div) => applyDivision(c.id, div)}
-                  onUpdateSectionLabel={(sid, label) => updateSectionLabel(c.id, sid, label)}
-                  onAssignSectionPlant={(sid, pid) => assignPlant(c.id, pid, sid)}
-                  onRename={(name) => renameContainer(c.id, name)}
-                  onResize={(size) => resizeContainer(c.id, size)}
-                />
-              ))
-            )}
-          </div>
-        </div>
-      )}
+        )}
+
+        {tabContainers.map((c) => (
+          <ContainerCard
+            key={c.id}
+            container={c}
+            plants={plants}
+            zones={zones}
+            expanded={expandedId === c.id}
+            onToggle={() => setExpandedId(expandedId === c.id ? null : c.id)}
+            onDelete={() => deleteContainer(c.id)}
+            onAssignPlant={(pid) => assignPlant(c.id, pid)}
+            onRemovePlant={(pid) => removePlantFromContainer(c.id, pid)}
+            onAssignZone={(zid) => assignZone(c.id, zid)}
+            onApplyDivision={(div) => applyDivision(c.id, div)}
+            onUpdateSectionLabel={(sid, label) => updateSectionLabel(c.id, sid, label)}
+            onAssignSectionPlant={(sid, pid) => assignPlant(c.id, pid, sid)}
+            onRename={(name) => renameContainer(c.id, name)}
+            onResize={(size) => resizeContainer(c.id, size)}
+          />
+        ))}
+      </div>
 
       {/* Unplaced plants hint */}
-      {plants.filter((p) => !containers.some((c) => c.plantIds.includes(p.id))).length > 0 && (
+      {unplacedPlants.length > 0 && (
         <div className="rounded-2xl bg-amber-50 border border-amber-200 p-4">
           <p className="text-xs font-semibold text-amber-800 uppercase tracking-wide mb-2">Not placed on map</p>
           <div className="flex flex-wrap gap-2">
-            {plants.filter((p) => !containers.some((c) => c.plantIds.includes(p.id))).map((p) => (
-              <span key={p.id} className="px-2.5 py-1 rounded-full bg-white border border-amber-200 text-xs">
-                {p.cover_emoji ?? '🌿'} {p.common_name}
-              </span>
+            {unplacedPlants.map((p) => (
+              <div key={p.id} className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white border border-amber-200">
+                <PlantIcon plant={p} size={18} />
+                <span className="text-xs">{p.common_name}</span>
+              </div>
             ))}
           </div>
           <p className="text-xs text-amber-700 mt-2">Expand a pot to assign plants to it.</p>

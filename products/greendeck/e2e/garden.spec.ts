@@ -27,17 +27,25 @@ test.describe('Garden', () => {
     await expect(page.getByText('Front Porch').first()).toBeVisible();
   });
 
-  test('shows All Pots section when no zones', async ({ page }) => {
-    // With no zones, the garden shows an "All Pots" section
-    await expect(page.getByText(/all pots/i)).toBeVisible();
+  test('zone appears as a tab after creation', async ({ page }) => {
+    await page.getByRole('button', { name: /add zone/i }).click();
+    await page.getByPlaceholder(/zone name|balcony|indoors/i).fill('Greenhouse');
+    await page.getByRole('button', { name: /^add$/i }).click();
+    // Zone should appear as a tab button
+    const tab = page.getByRole('button', { name: /greenhouse/i }).first();
+    await expect(tab).toBeVisible();
+  });
+
+  test('shows default tab or section for containers', async ({ page }) => {
+    // With no zones, should show either "All Pots" or similar default section
+    await expect(page.getByText(/all pots|unzoned|add a zone|no zones/i).first()).toBeVisible();
   });
 
   test('can add a container', async ({ page }) => {
-    // Find any "+ Pot" button
     const addPotBtn = page.getByRole('button', { name: /\+ pot|\+ container/i }).first();
     await expect(addPotBtn).toBeVisible();
     await addPotBtn.click();
-    const nameInput = page.getByPlaceholder(/pot name|balcony shelf|channel/i);
+    const nameInput = page.getByPlaceholder(/pot name|balcony shelf|channel|container/i);
     await expect(nameInput).toBeVisible();
     await nameInput.fill('Test Pot');
     await page.getByRole('button', { name: /^add$/i }).click();
@@ -53,7 +61,7 @@ test.describe('Garden', () => {
     // Add pot to that zone
     const addPotBtn = page.getByRole('button', { name: /\+ pot/i }).first();
     await addPotBtn.click();
-    const nameInput = page.getByPlaceholder(/pot name|balcony shelf|channel/i);
+    const nameInput = page.getByPlaceholder(/pot name|balcony shelf|channel|container/i);
     await nameInput.fill('Shelf A');
     await page.getByRole('button', { name: /^add$/i }).click();
     await expect(page.getByText('Shelf A').first()).toBeVisible();

@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { LocalPlant } from '@/types/index';
+import { LocalPlant, PhotoEntry } from '@/types/index';
 
 const EMOJIS = ['🌿', '🪴', '🌵', '🌸', '🌺', '🍃', '🌾', '🎋', '🍀', '🌱', '🌼', '🌻', '🍄', '🪷', '🌴'];
 
@@ -19,7 +19,7 @@ async function compressImage(file: File): Promise<string> {
     const img = new Image();
     const url = URL.createObjectURL(file);
     img.onload = () => {
-      const MAX = 600;
+      const MAX = 900;
       let { width, height } = img;
       if (width > MAX || height > MAX) {
         if (width > height) { height = Math.round((height / width) * MAX); width = MAX; }
@@ -30,7 +30,7 @@ async function compressImage(file: File): Promise<string> {
       canvas.height = height;
       canvas.getContext('2d')!.drawImage(img, 0, 0, width, height);
       URL.revokeObjectURL(url);
-      resolve(canvas.toDataURL('image/jpeg', 0.75));
+      resolve(canvas.toDataURL('image/jpeg', 0.8));
     };
     img.src = url;
   });
@@ -48,7 +48,8 @@ export default function NewPlantPage() {
     notes: '',
     cover_emoji: '🌿',
   });
-  const [photos, setPhotos] = useState<string[]>([]);
+  const [photos, setPhotos] = useState<PhotoEntry[]>([]);
+  const [mainPhotoIndex, setMainPhotoIndex] = useState(0);
   const [saving, setSaving] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiDetails, setAiDetails] = useState<AiDetails | null>(null);
@@ -62,22 +63,31 @@ export default function NewPlantPage() {
   }
 
   useEffect(() => {
-    return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-    };
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
   }, []);
 
   async function handlePhotoSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? []);
-    const remaining = 4 - photos.length;
-    const toProcess = files.slice(0, remaining);
-    const compressed = await Promise.all(toProcess.map(compressImage));
-    setPhotos((prev) => [...prev, ...compressed].slice(0, 4));
+    const compressed = await Promise.all(files.map(compressImage));
+    const newEntries: PhotoEntry[] = compressed.map((url) => ({
+      url,
+      timestamp: new Date().toISOString(),
+      comment: '',
+    }));
+    setPhotos((prev) => [...prev, ...newEntries]);
     e.target.value = '';
   }
 
   function removePhoto(idx: number) {
-    setPhotos((prev) => prev.filter((_, i) => i !== idx));
+    setPhotos((prev) => {
+      const next = prev.filter((_, i) => i !== idx);
+      if (mainPhotoIndex >= next.length) setMainPhotoIndex(Math.max(0, next.length - 1));
+      return next;
+    });
+  }
+
+  function updateComment(idx: number, comment: string) {
+    setPhotos((prev) => prev.map((p, i) => i === idx ? { ...p, comment } : p));
   }
 
   async function fetchAiDetails(name: string) {
@@ -95,7 +105,7 @@ export default function NewPlantPage() {
       setAiDetails(json.details);
       setAiExpanded(true);
     } catch (e) {
-      setAiError(String(e));
+      setAiError(e instanceof Error ? e.message : String(e));
     } finally {
       setAiLoading(false);
     }
@@ -108,10 +118,7 @@ export default function NewPlantPage() {
 
   function acceptAiDetails() {
     if (!aiDetails) return;
-    setForm((prev) => ({
-      ...prev,
-      scientific_name: aiDetails.scientific_name ?? prev.scientific_name,
-    }));
+    setForm((prev) => ({ ...prev, scientific_name: aiDetails.scientific_name ?? prev.scientific_name }));
     setAiExpanded(false);
   }
 
@@ -125,6 +132,7 @@ export default function NewPlantPage() {
       collector_tag: form.collector_tag || `GD-${String(existing.length + 1).padStart(3, '0')}`,
       added_at: new Date().toISOString(),
       photos: photos.length > 0 ? photos : undefined,
+      mainPhotoIndex: photos.length > 0 ? mainPhotoIndex : undefined,
       watering_needs: aiDetails?.watering,
       sunlight_needs: aiDetails?.sunlight,
       care_level: aiDetails?.care_level,
@@ -144,45 +152,78 @@ export default function NewPlantPage() {
 
       {/* Photo upload */}
       <div>
-        <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Photos</label>
-        <div className="mt-2 flex items-center gap-2 flex-wrap">
-          {photos.map((src, idx) => (
-            <div key={idx} className="relative w-[50px] h-[50px] flex-shrink-0">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={src} alt={`photo ${idx + 1}`} className="w-full h-full object-cover rounded-xl border border-border" />
-              <button
-                onClick={() => removePhoto(idx)}
-                className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-destructive text-white text-xs flex items-center justify-center leading-none"
-                aria-label="Remove photo"
-              >
-                ×
-              </button>
-            </div>
-          ))}
-          {photos.length < 4 && (
-            <button
-              onClick={() => photoInputRef.current?.click()}
-              className="w-[50px] h-[50px] rounded-xl border border-dashed border-border bg-muted flex items-center justify-center text-lg flex-shrink-0"
-              aria-label="Add photo"
-            >
-              📷
-            </button>
-          )}
-          <input
-            ref={photoInputRef}
-            type="file"
-            accept="image/*"
-            multiple
-            className="hidden"
-            onChange={handlePhotoSelect}
-          />
+        <div className="flex items-center justify-between mb-2">
+          <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Photos</label>
+          <button
+            onClick={() => photoInputRef.current?.click()}
+            className="text-xs font-medium text-primary"
+          >
+            + Add Photo
+          </button>
         </div>
-        <p className="text-xs text-muted-foreground mt-1">Up to 4 photos · compressed to 600px</p>
+
+        {photos.length > 0 && (
+          <div className="space-y-2 mb-2">
+            {photos.map((photo, idx) => (
+              <div key={idx} className={`rounded-2xl border overflow-hidden ${idx === mainPhotoIndex ? 'border-primary' : 'border-border'}`}>
+                <div className="flex gap-3 p-2">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={photo.url} alt="" className="w-16 h-16 object-cover rounded-xl flex-shrink-0" />
+                  <div className="flex-1 min-w-0 space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-muted-foreground">
+                        {new Date(photo.timestamp).toLocaleDateString('en', { month: 'short', day: 'numeric', year: 'numeric' })}
+                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={() => setMainPhotoIndex(idx)}
+                          className={`text-xs px-2 py-0.5 rounded-lg ${idx === mainPhotoIndex ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}
+                        >
+                          {idx === mainPhotoIndex ? 'Main' : 'Set main'}
+                        </button>
+                        <button onClick={() => removePhoto(idx)} className="text-xs text-destructive px-1">✕</button>
+                      </div>
+                    </div>
+                    <input
+                      value={photo.comment ?? ''}
+                      onChange={(e) => updateComment(idx, e.target.value)}
+                      placeholder="Add a note about this photo..."
+                      className="w-full rounded-xl border border-border bg-input px-2 py-1.5 text-xs"
+                    />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {photos.length === 0 && (
+          <button
+            onClick={() => photoInputRef.current?.click()}
+            className="w-full h-24 rounded-2xl border border-dashed border-border bg-muted/30 flex flex-col items-center justify-center gap-1 text-muted-foreground"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-6 h-6">
+              <rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/>
+              <path d="m21 15-5-5L5 21"/>
+            </svg>
+            <span className="text-xs">Tap to upload photos of your plant</span>
+          </button>
+        )}
+
+        <input
+          ref={photoInputRef}
+          type="file"
+          accept="image/*"
+          multiple
+          className="hidden"
+          onChange={handlePhotoSelect}
+        />
+        <p className="text-xs text-muted-foreground mt-1">No limit · compressed automatically · notes become part of your plant's log</p>
       </div>
 
       {/* Emoji picker */}
       <div>
-        <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Icon</label>
+        <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Icon (used when no photo)</label>
         <div className="mt-2 flex flex-wrap gap-2">
           {EMOJIS.map((e) => (
             <button
@@ -199,7 +240,7 @@ export default function NewPlantPage() {
       </div>
 
       <div className="space-y-4">
-        {/* Common name with AI lookup */}
+        {/* Common name with AI */}
         <div>
           <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
             Common name <span className="text-destructive">*</span>
@@ -221,7 +262,6 @@ export default function NewPlantPage() {
           </div>
         </div>
 
-        {/* AI Details panel */}
         {aiDetails && (
           <div className="rounded-2xl border border-primary/30 bg-primary/5 p-4 space-y-2">
             <div className="flex items-center justify-between">
@@ -232,25 +272,12 @@ export default function NewPlantPage() {
             </div>
             {aiExpanded && (
               <div className="space-y-2 text-sm">
-                {aiDetails.scientific_name && (
-                  <div><span className="text-muted-foreground text-xs">Scientific name: </span><span className="italic">{aiDetails.scientific_name}</span></div>
-                )}
-                {aiDetails.care_level && (
-                  <div><span className="text-muted-foreground text-xs">Care level: </span><span className="font-medium capitalize">{aiDetails.care_level}</span></div>
-                )}
-                {aiDetails.watering && (
-                  <div><span className="text-muted-foreground text-xs">Watering: </span>{aiDetails.watering}</div>
-                )}
-                {aiDetails.sunlight && (
-                  <div><span className="text-muted-foreground text-xs">Sunlight: </span>{aiDetails.sunlight}</div>
-                )}
-                {aiDetails.description && (
-                  <p className="text-xs text-muted-foreground">{aiDetails.description}</p>
-                )}
-                <button
-                  onClick={acceptAiDetails}
-                  className="w-full rounded-xl bg-primary text-primary-foreground py-2 text-xs font-semibold"
-                >
+                {aiDetails.scientific_name && <div><span className="text-muted-foreground text-xs">Scientific name: </span><span className="italic">{aiDetails.scientific_name}</span></div>}
+                {aiDetails.care_level && <div><span className="text-muted-foreground text-xs">Care level: </span><span className="font-medium capitalize">{aiDetails.care_level}</span></div>}
+                {aiDetails.watering && <div><span className="text-muted-foreground text-xs">Watering: </span>{aiDetails.watering}</div>}
+                {aiDetails.sunlight && <div><span className="text-muted-foreground text-xs">Sunlight: </span>{aiDetails.sunlight}</div>}
+                {aiDetails.description && <p className="text-xs text-muted-foreground">{aiDetails.description}</p>}
+                <button onClick={acceptAiDetails} className="w-full rounded-xl bg-primary text-primary-foreground py-2 text-xs font-semibold">
                   Use scientific name suggestion
                 </button>
               </div>
@@ -259,7 +286,9 @@ export default function NewPlantPage() {
         )}
 
         {aiError && (
-          <p className="text-xs text-destructive">AI lookup failed: {aiError}</p>
+          <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-3">
+            <p className="text-xs text-destructive">{aiError}</p>
+          </div>
         )}
 
         <div>
@@ -285,11 +314,8 @@ export default function NewPlantPage() {
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Health</label>
-            <select
-              value={form.health_status}
-              onChange={(e) => update('health_status', e.target.value)}
-              className="mt-1 w-full rounded-xl border border-border bg-input px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/30"
-            >
+            <select value={form.health_status} onChange={(e) => update('health_status', e.target.value)}
+              className="mt-1 w-full rounded-xl border border-border bg-input px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/30">
               <option value="healthy">Healthy</option>
               <option value="watch">Watch</option>
               <option value="sick">Sick</option>
@@ -298,11 +324,8 @@ export default function NewPlantPage() {
           </div>
           <div>
             <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Stage</label>
-            <select
-              value={form.stage}
-              onChange={(e) => update('stage', e.target.value)}
-              className="mt-1 w-full rounded-xl border border-border bg-input px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/30"
-            >
+            <select value={form.stage} onChange={(e) => update('stage', e.target.value)}
+              className="mt-1 w-full rounded-xl border border-border bg-input px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/30">
               <option value="seed">Seed</option>
               <option value="seedling">Seedling</option>
               <option value="juvenile">Juvenile</option>
@@ -316,13 +339,10 @@ export default function NewPlantPage() {
           <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Growing System</label>
           <div className="mt-2 grid grid-cols-3 gap-2">
             {(['soil', 'kratky', 'nft', 'dwc', 'semi_hydro'] as const).map((sys) => (
-              <button
-                key={sys}
-                onClick={() => update('growing_system', sys)}
+              <button key={sys} onClick={() => update('growing_system', sys)}
                 className={`rounded-xl border py-2 text-xs font-semibold transition-colors ${
                   form.growing_system === sys ? 'bg-primary text-primary-foreground border-primary' : 'bg-card border-border text-foreground'
-                }`}
-              >
+                }`}>
                 {sys === 'semi_hydro' ? 'Semi-Hydro' : sys.toUpperCase()}
               </button>
             ))}
@@ -331,9 +351,7 @@ export default function NewPlantPage() {
 
         <div>
           <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Notes</label>
-          <textarea
-            value={form.notes}
-            onChange={(e) => update('notes', e.target.value)}
+          <textarea value={form.notes} onChange={(e) => update('notes', e.target.value)}
             placeholder="Variegation notes, origin, propagation history..."
             rows={3}
             className="mt-1 w-full rounded-xl border border-border bg-input px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/30 resize-none"

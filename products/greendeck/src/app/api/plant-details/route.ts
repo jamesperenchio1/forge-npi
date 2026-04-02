@@ -3,19 +3,10 @@ import { NextResponse } from 'next/server';
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY ?? '');
 
-export async function POST(request: Request) {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    return NextResponse.json({ error: 'Gemini API key not configured' }, { status: 500 });
-  }
+// Model chain: try each in order until one succeeds
+const MODEL_CHAIN = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-flash-8b'];
 
-  try {
-    const body = await request.json();
-    const name = body?.name?.toString().trim();
-    if (!name) return NextResponse.json({ error: 'name required' }, { status: 400 });
-
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
-    const prompt = `You are a plant expert. Return a JSON object (no markdown, no code blocks, pure JSON only) with information about the plant named "${name}".
+const PROMPT = (name: string) => `You are a plant expert. Return a JSON object (no markdown, no code blocks, pure JSON only) with information about the plant named "${name}".
 
 Format:
 {
@@ -29,27 +20,61 @@ Format:
 For care_level use exactly: easy, moderate, or difficult.
 Respond ONLY with the JSON object, nothing else.`;
 
-    const result = await model.generateContent(prompt);
-    const raw = result.response.text().trim()
-      .replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/i, '').trim();
-
-    let details;
-    try {
-      details = JSON.parse(raw);
-    } catch {
-      // Try to extract JSON from the response
-      const match = raw.match(/\{[\s\S]*\}/);
-      if (match) {
-        details = JSON.parse(match[0]);
-      } else {
-        throw new Error('Invalid JSON response from AI');
-      }
-    }
-
-    return NextResponse.json({ details });
-  } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : String(e);
-    console.error('plant-details error:', msg);
-    return NextResponse.json({ error: msg }, { status: 500 });
+function parseJSON(raw: string) {
+  const cleaned = raw.trim()
+    .replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/i, '').trim();
+  try {
+    return JSON.parse(cleaned);
+  } catch {
+    const match = cleaned.match(/\{[\s\S]*\}/);
+    if (match) return JSON.parse(match[0]);
+    throw new Error('Could not parse AI response as JSON');
   }
+}
+
+function isQuotaError(e: unknown): boolean {
+  const msg = e instanceof Error ? e.message : String(e);
+  return msg.includes('429') || msg.includes('quota') || msg.includes('RESOURCE_EXHAUSTED');
+}
+
+export async function POST(request: Request) {
+  if (!process.env.GEMINI_API_KEY) {
+    return NextResponse.json({ error: 'Gemini API key not configured' }, { status: 500 });
+  }
+
+  const body = await request.json().catch(() => ({}));
+  const name = body?.name?.toString().trim();
+  if (!name) return NextResponse.json({ error: 'Plant name is required' }, { status: 400 });
+
+  let lastError: unknown;
+
+  for (const modelName of MODEL_CHAIN) {
+    try {
+      const model = genAI.getGenerativeModel({ model: modelName });
+      const result = await model.generateContent(PROMPT(name));
+      const details = parseJSON(result.response.text());
+      return NextResponse.json({ details });
+    } catch (e: unknown) {
+      lastError = e;
+      if (isQuotaError(e)) {
+        // Try next model in chain
+        continue;
+      }
+      // Non-quota error — bail immediately
+      break;
+    }
+  }
+
+  const msg = lastError instanceof Error ? lastError.message : String(lastError);
+  const isQuota = isQuotaError(lastError);
+
+  console.error('plant-details error:', msg);
+  return NextResponse.json(
+    {
+      error: isQuota
+        ? 'Gemini API quota exceeded. The free tier limit has been reached. Please try again tomorrow or enable billing on your Google AI project.'
+        : `AI lookup failed: ${msg}`,
+    },
+    { status: isQuota ? 429 : 500 }
+  );
 }

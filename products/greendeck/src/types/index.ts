@@ -1,3 +1,10 @@
+// A single uploaded photo with metadata
+export type PhotoEntry = {
+  url: string;       // base64 data URL (compressed)
+  timestamp: string; // ISO 8601 — set automatically on upload
+  comment?: string;  // optional user note / log entry
+};
+
 // Core plant type stored in localStorage
 export type LocalPlant = {
   id: string;
@@ -10,7 +17,8 @@ export type LocalPlant = {
   notes?: string;
   added_at: string;
   cover_emoji?: string;
-  photos?: string[]; // base64 data URLs
+  photos?: PhotoEntry[];   // replaces the old string[] — each has url + timestamp + comment
+  mainPhotoIndex?: number; // index into photos[] to use as primary avatar
   // Gemini-fetched details
   watering_needs?: string;
   sunlight_needs?: string;
@@ -85,4 +93,14 @@ export type CalendarEvent = {
   plant_name: string;
   notes?: string;
   color?: string;
+};
+
+// A device in a hydroponic / grow setup for power cost calculation
+export type HydroDevice = {
+  id: string;
+  name: string;
+  category: 'pump' | 'airstone' | 'light' | 'fan' | 'heater' | 'sensor' | 'other';
+  watts: number;
+  hours_per_day: number;
+  enabled: boolean;
 };

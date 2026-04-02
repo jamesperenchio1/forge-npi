@@ -1,3 +1,5 @@
+export type IconType = 'bug' | 'fly' | 'fungus' | 'mite' | 'aphid' | 'scale' | 'smoke' | 'blight' | 'mold';
+
 export type PestEntry = {
   name: string;
   months: number[];
@@ -7,6 +9,7 @@ export type PestEntry = {
   region?: 'all' | 'north' | 'central' | 'south';
   emoji: string;
   type: 'pest' | 'disease';
+  iconType: IconType;
   imageUrl?: string;
 };
 
@@ -22,6 +25,7 @@ export const THAILAND_PESTS: PestEntry[] = [
     region: 'all',
     emoji: '🪲',
     type: 'pest',
+    iconType: 'bug',
   },
   {
     name: 'Spider Mites',
@@ -32,6 +36,7 @@ export const THAILAND_PESTS: PestEntry[] = [
     region: 'all',
     emoji: '🕷️',
     type: 'pest',
+    iconType: 'mite',
   },
   {
     name: 'Fungus Gnats',
@@ -42,6 +47,7 @@ export const THAILAND_PESTS: PestEntry[] = [
     region: 'all',
     emoji: '🪰',
     type: 'pest',
+    iconType: 'fly',
   },
   {
     name: 'Thrips',
@@ -52,6 +58,7 @@ export const THAILAND_PESTS: PestEntry[] = [
     region: 'all',
     emoji: '🐛',
     type: 'pest',
+    iconType: 'bug',
   },
   {
     name: 'Aphids',
@@ -62,6 +69,7 @@ export const THAILAND_PESTS: PestEntry[] = [
     region: 'all',
     emoji: '🐜',
     type: 'pest',
+    iconType: 'aphid',
   },
   {
     name: 'Root Rot (Pythium)',
@@ -72,6 +80,7 @@ export const THAILAND_PESTS: PestEntry[] = [
     region: 'all',
     emoji: '🍄',
     type: 'disease',
+    iconType: 'fungus',
   },
   {
     name: 'Smoke/PM2.5 Damage',
@@ -82,6 +91,7 @@ export const THAILAND_PESTS: PestEntry[] = [
     region: 'north',
     emoji: '💨',
     type: 'disease',
+    iconType: 'smoke',
   },
   {
     name: 'Powdery Mildew',
@@ -92,6 +102,7 @@ export const THAILAND_PESTS: PestEntry[] = [
     region: 'all',
     emoji: '⬜',
     type: 'disease',
+    iconType: 'mold',
   },
   {
     name: 'Leaf Blight (Alternaria)',
@@ -102,6 +113,7 @@ export const THAILAND_PESTS: PestEntry[] = [
     region: 'all',
     emoji: '🍂',
     type: 'disease',
+    iconType: 'blight',
   },
   {
     name: 'Scale Insects',
@@ -112,6 +124,7 @@ export const THAILAND_PESTS: PestEntry[] = [
     region: 'all',
     emoji: '🦗',
     type: 'pest',
+    iconType: 'scale',
   },
 ];
 

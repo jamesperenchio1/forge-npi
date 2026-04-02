@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { LocalPlant, CareLog, DoctorLog } from '@/types/index';
 import { getPestsForMonth } from '@/lib/pest-calendar';
+import { PestIcon } from '@/components/pest/PestIcon';
 import { use } from 'react';
 
 const HEALTH_STYLES: Record<string, string> = {
@@ -32,17 +33,41 @@ const URGENCY_STYLES: Record<string, string> = {
   emergency: 'bg-red-50 border-red-200 text-red-900',
 };
 
+async function compressImage(file: File): Promise<string> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const MAX = 600;
+      let { width, height } = img;
+      if (width > MAX || height > MAX) {
+        if (width > height) { height = Math.round((height / width) * MAX); width = MAX; }
+        else { width = Math.round((width / height) * MAX); height = MAX; }
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      canvas.getContext('2d')!.drawImage(img, 0, 0, width, height);
+      URL.revokeObjectURL(url);
+      resolve(canvas.toDataURL('image/jpeg', 0.75));
+    };
+    img.src = url;
+  });
+}
+
 export default function PlantDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
   const [plant, setPlant] = useState<LocalPlant | null>(null);
   const [editMode, setEditMode] = useState(false);
   const [editForm, setEditForm] = useState<Partial<LocalPlant>>({});
+  const [editPhotos, setEditPhotos] = useState<string[]>([]);
   const [careLogs, setCareLogs] = useState<CareLog[]>([]);
   const [doctorLogs, setDoctorLogs] = useState<DoctorLog[]>([]);
   const [addingLog, setAddingLog] = useState(false);
   const [newLogType, setNewLogType] = useState<CareLog['type']>('watered');
   const [newLogNotes, setNewLogNotes] = useState('');
+  const photoInputRef = useRef<HTMLInputElement>(null);
 
   const month = new Date().getMonth() + 1;
   const pests = getPestsForMonth(month);
@@ -53,6 +78,7 @@ export default function PlantDetailPage({ params }: { params: Promise<{ id: stri
     if (found) {
       setPlant(found);
       setEditForm(found);
+      setEditPhotos(found.photos ?? []);
     }
     const logs = JSON.parse(localStorage.getItem('greendeck_care_logs') ?? '[]') as CareLog[];
     setCareLogs(logs.filter((l) => l.plant_id === id).sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()));
@@ -60,12 +86,26 @@ export default function PlantDetailPage({ params }: { params: Promise<{ id: stri
     setDoctorLogs(dLogs.filter((l) => l.plant_id === id).sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()));
   }, [id]);
 
+  async function handlePhotoSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files ?? []);
+    const remaining = 4 - editPhotos.length;
+    const toProcess = files.slice(0, remaining);
+    const compressed = await Promise.all(toProcess.map(compressImage));
+    setEditPhotos((prev) => [...prev, ...compressed].slice(0, 4));
+    e.target.value = '';
+  }
+
+  function removeEditPhoto(idx: number) {
+    setEditPhotos((prev) => prev.filter((_, i) => i !== idx));
+  }
+
   function saveEdit() {
     if (!plant) return;
     const stored = JSON.parse(localStorage.getItem('greendeck_plants') ?? '[]') as LocalPlant[];
-    const updated = stored.map((p) => p.id === plant.id ? { ...p, ...editForm } : p);
+    const updatedPlant = { ...plant, ...editForm, photos: editPhotos.length > 0 ? editPhotos : undefined };
+    const updated = stored.map((p) => p.id === plant.id ? updatedPlant : p);
     localStorage.setItem('greendeck_plants', JSON.stringify(updated));
-    setPlant({ ...plant, ...editForm } as LocalPlant);
+    setPlant(updatedPlant as LocalPlant);
     setEditMode(false);
   }
 
@@ -99,6 +139,8 @@ export default function PlantDetailPage({ params }: { params: Promise<{ id: stri
       <Link href="/plants" className="text-primary text-sm mt-2 block">Back to collection</Link>
     </div>
   );
+
+  const displayPhotos = editMode ? editPhotos : (plant.photos ?? []);
 
   return (
     <div className="max-w-lg mx-auto px-4 py-6 space-y-5">
@@ -143,12 +185,55 @@ export default function PlantDetailPage({ params }: { params: Promise<{ id: stri
         {editMode ? (
           <div className="flex gap-2">
             <button onClick={saveEdit} className="rounded-xl bg-primary text-primary-foreground px-3 py-1.5 text-xs font-semibold">Save</button>
-            <button onClick={() => { setEditMode(false); setEditForm(plant); }} className="rounded-xl bg-muted border border-border px-3 py-1.5 text-xs">Cancel</button>
+            <button onClick={() => { setEditMode(false); setEditForm(plant); setEditPhotos(plant.photos ?? []); }} className="rounded-xl bg-muted border border-border px-3 py-1.5 text-xs">Cancel</button>
           </div>
         ) : (
           <button onClick={() => setEditMode(true)} className="rounded-xl bg-muted border border-border px-3 py-1.5 text-xs font-medium">Edit</button>
         )}
       </div>
+
+      {/* Photos */}
+      {(displayPhotos.length > 0 || editMode) && (
+        <div>
+          {editMode && (
+            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-2">Photos</label>
+          )}
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            {displayPhotos.map((src, idx) => (
+              <div key={idx} className="relative flex-shrink-0">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={src} alt={`photo ${idx + 1}`} className="w-[80px] h-[80px] object-cover rounded-xl border border-border" />
+                {editMode && (
+                  <button
+                    onClick={() => removeEditPhoto(idx)}
+                    className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-destructive text-white text-xs flex items-center justify-center leading-none"
+                    aria-label="Remove photo"
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+            ))}
+            {editMode && editPhotos.length < 4 && (
+              <button
+                onClick={() => photoInputRef.current?.click()}
+                className="w-[80px] h-[80px] rounded-xl border border-dashed border-border bg-muted flex items-center justify-center text-xl flex-shrink-0"
+                aria-label="Add photo"
+              >
+                📷
+              </button>
+            )}
+          </div>
+          <input
+            ref={photoInputRef}
+            type="file"
+            accept="image/*"
+            multiple
+            className="hidden"
+            onChange={handlePhotoSelect}
+          />
+        </div>
+      )}
 
       {/* Health status */}
       <div className={`rounded-2xl border p-4 ${HEALTH_STYLES[editMode ? (editForm.health_status ?? plant.health_status) : plant.health_status]}`}>
@@ -277,7 +362,7 @@ export default function PlantDetailPage({ params }: { params: Promise<{ id: stri
           <div className="space-y-2.5">
             {pests.slice(0, 2).map((p) => (
               <div key={p.name} className="flex items-start gap-3">
-                <span className="text-base">{p.emoji}</span>
+                <PestIcon type={p.iconType} size={32} />
                 <div>
                   <p className="text-sm font-medium">{p.name}</p>
                   <p className="text-xs text-muted-foreground">{p.signs}</p>

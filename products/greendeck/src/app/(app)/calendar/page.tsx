@@ -15,6 +15,24 @@ const EVENT_TYPES: { value: CalendarEvent['type']; label: string; emoji: string;
   { value: 'custom', label: 'Custom', emoji: '📝', color: '#14b8a6' },
 ];
 
+const THAILAND_PLANTING_GUIDE = [
+  { name: 'Thai Basil', emoji: '🌿', sow_indoors: [1,2,11,12], sow_outdoors: [2,3,10,11], harvest: [4,5,6,7,8,9], notes: 'Bolts in heat — harvest before flowering' },
+  { name: 'Chilli', emoji: '🌶️', sow_indoors: [10,11,12,1], sow_outdoors: [11,12,1,2], harvest: [3,4,5,6,7], notes: 'Start indoors 8 weeks before transplant' },
+  { name: 'Cherry Tomato', emoji: '🍅', sow_indoors: [10,11,12], sow_outdoors: [11,12,1], harvest: [1,2,3,4,5], notes: 'Cool season crop. Avoid monsoon months.' },
+  { name: 'Morning Glory', emoji: '🌸', sow_indoors: [], sow_outdoors: [3,4,5,6,7,8,9,10], harvest: [4,5,6,7,8,9,10,11], notes: 'Direct sow only. Loves heat and rain.' },
+  { name: 'Lemongrass', emoji: '🌾', sow_indoors: [], sow_outdoors: [4,5,6], harvest: [8,9,10,11,12,1], notes: 'Propagate by division. Harvest outer stalks.' },
+  { name: 'Kaffir Lime', emoji: '🍋', sow_indoors: [2,3], sow_outdoors: [4,5], harvest: [10,11,12,1,2], notes: 'Leaves year-round once established.' },
+  { name: 'Galangal', emoji: '🫚', sow_indoors: [], sow_outdoors: [4,5,6], harvest: [10,11,12,1], notes: 'Plant rhizomes at rainy season start.' },
+  { name: 'Long Bean', emoji: '🫘', sow_indoors: [], sow_outdoors: [2,3,9,10], harvest: [4,5,11,12], notes: 'Fast-growing. Two crops per year.' },
+  { name: 'Thai Eggplant', emoji: '🍆', sow_indoors: [10,11,12], sow_outdoors: [12,1,2], harvest: [3,4,5,6], notes: 'Cool season start, warm harvest.' },
+  { name: 'Sweet Potato', emoji: '🍠', sow_indoors: [], sow_outdoors: [5,6,7], harvest: [9,10,11], notes: 'Plant slips. Loves monsoon rain.' },
+  { name: 'Cucumber', emoji: '🥒', sow_indoors: [10,11], sow_outdoors: [11,12,1], harvest: [1,2,3,4], notes: 'Avoid wet season — fungal issues.' },
+  { name: 'Pumpkin/Gourd', emoji: '🎃', sow_indoors: [], sow_outdoors: [10,11,12], harvest: [1,2,3], notes: 'Cool season squash. Needs space.' },
+  { name: 'Roselle', emoji: '🌺', sow_indoors: [3,4], sow_outdoors: [5,6], harvest: [10,11,12], notes: 'Harvest calyxes after monsoon.' },
+  { name: 'Pandan', emoji: '🍃', sow_indoors: [], sow_outdoors: [4,5,6,7], harvest: [1,2,3,4,5,6,7,8,9,10,11,12], notes: 'Once established, harvest year-round.' },
+  { name: 'Turmeric', emoji: '🟡', sow_indoors: [], sow_outdoors: [4,5,6], harvest: [11,12,1], notes: 'Plant rhizomes. Needs rich soil.' },
+];
+
 function toYMD(date: Date): string {
   return date.toISOString().split('T')[0];
 }
@@ -45,6 +63,8 @@ export default function CalendarPage() {
   const [selected, setSelected] = useState<Date | undefined>(undefined);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [addFormOpen, setAddFormOpen] = useState(false);
+  const [sowFilter, setSowFilter] = useState<'all' | 'sow' | 'harvest'>('all');
+  const currentMonth = new Date().getMonth() + 1;
 
   // Form state
   const [formDate, setFormDate] = useState('');
@@ -393,6 +413,101 @@ export default function CalendarPage() {
             })}
           </div>
         )}
+      </div>
+
+      {/* Thailand Sowing Guide */}
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+            Thailand Sowing Guide
+          </h2>
+          <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium">
+            {new Date().toLocaleDateString('en', { month: 'long' })}
+          </span>
+        </div>
+
+        <div className="flex gap-1.5 mb-3">
+          {(['all', 'sow', 'harvest'] as const).map((f) => (
+            <button
+              key={f}
+              onClick={() => setSowFilter(f)}
+              className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+                sowFilter === f ? 'bg-primary text-primary-foreground border-primary' : 'bg-muted border-border text-muted-foreground'
+              }`}
+            >
+              {f === 'all' ? 'All Plants' : f === 'sow' ? 'Sow Now' : 'Harvest Now'}
+            </button>
+          ))}
+        </div>
+
+        <div className="space-y-2">
+          {THAILAND_PLANTING_GUIDE
+            .filter((p) => {
+              if (sowFilter === 'sow') return p.sow_indoors.includes(currentMonth) || p.sow_outdoors.includes(currentMonth);
+              if (sowFilter === 'harvest') return p.harvest.includes(currentMonth);
+              return true;
+            })
+            .map((p) => {
+              const sowIndoorNow = p.sow_indoors.includes(currentMonth);
+              const sowOutdoorNow = p.sow_outdoors.includes(currentMonth);
+              const harvestNow = p.harvest.includes(currentMonth);
+              const hasActivity = sowIndoorNow || sowOutdoorNow || harvestNow;
+
+              return (
+                <div
+                  key={p.name}
+                  className={`rounded-xl border p-3 flex items-start gap-3 ${hasActivity ? 'bg-card border-border' : 'bg-muted/40 border-border/50'}`}
+                >
+                  <span className="text-2xl flex-shrink-0">{p.emoji}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold">{p.name}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{p.notes}</p>
+                    <div className="flex flex-wrap gap-1.5 mt-1.5">
+                      {sowIndoorNow && (
+                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 border border-blue-200">
+                          Sow Indoors
+                        </span>
+                      )}
+                      {sowOutdoorNow && (
+                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-green-100 text-green-800 border border-green-200">
+                          Sow Outdoors
+                        </span>
+                      )}
+                      {harvestNow && (
+                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200">
+                          Harvest Window
+                        </span>
+                      )}
+                      {!hasActivity && (
+                        <span className="text-[10px] text-muted-foreground">Not in season</span>
+                      )}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => {
+                      const today = toYMD(new Date());
+                      const eventType = harvestNow ? 'harvest' : 'plant';
+                      const newEv: CalendarEvent = {
+                        id: crypto.randomUUID(),
+                        date: today,
+                        type: eventType,
+                        plant_name: p.name,
+                        notes: p.notes,
+                        color: EVENT_TYPES.find((t) => t.value === eventType)?.color,
+                      };
+                      const updated = [...events, newEv];
+                      setEvents(updated);
+                      saveEvents(updated);
+                    }}
+                    className="flex-shrink-0 text-xs text-primary border border-primary/30 rounded-lg px-2 py-1 hover:bg-primary/10 transition-colors"
+                    title="Add to today's calendar"
+                  >
+                    + Add
+                  </button>
+                </div>
+              );
+            })}
+        </div>
       </div>
     </div>
   );

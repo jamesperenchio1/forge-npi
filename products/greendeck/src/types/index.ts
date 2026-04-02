@@ -10,6 +10,7 @@ export type LocalPlant = {
   notes?: string;
   added_at: string;
   cover_emoji?: string;
+  photos?: string[]; // base64 data URLs
   // Gemini-fetched details
   watering_needs?: string;
   sunlight_needs?: string;

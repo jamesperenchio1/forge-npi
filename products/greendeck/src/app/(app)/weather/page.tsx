@@ -1,9 +1,30 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { WeatherData, weatherCodeLabel, uvLabel, uvColor } from '@/lib/openmeteo';
 import { getPestsForMonth } from '@/lib/pest-calendar';
 import { getSunPosition, getSunTimes, getDaySunPath } from '@/lib/suncalc';
+import { PestIcon } from '@/components/pest/PestIcon';
+
+const WEATHER_CACHE_KEY = 'greendeck_weather_cache';
+const WEATHER_CACHE_TTL = 30 * 60 * 1000;
+
+interface WeatherCache { data: WeatherData; lat: number; lon: number; timestamp: number; }
+
+function getCachedWeather(lat: number, lon: number): WeatherData | null {
+  try {
+    const raw = localStorage.getItem(WEATHER_CACHE_KEY);
+    if (!raw) return null;
+    const cache: WeatherCache = JSON.parse(raw);
+    if (Date.now() - cache.timestamp > WEATHER_CACHE_TTL) return null;
+    if (Math.abs(cache.lat - lat) > 0.5 || Math.abs(cache.lon - lon) > 0.5) return null;
+    return cache.data;
+  } catch { return null; }
+}
+
+function setCachedWeather(lat: number, lon: number, data: WeatherData) {
+  try { localStorage.setItem(WEATHER_CACHE_KEY, JSON.stringify({ data, lat, lon, timestamp: Date.now() })); } catch {}
+}
 import {
   AreaChart,
   Area,
@@ -95,9 +116,10 @@ const CHART_CONFIG: Record<ChartTab, {
 export default function WeatherPage() {
   const [weather, setWeather] = useState<WeatherData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [locationName, setLocationName] = useState('Detecting...');
+  const [locationName, setLocationName] = useState('Bangkok');
   const [coords, setCoords] = useState<{ lat: number; lon: number }>({ lat: 13.7563, lon: 100.5018 });
   const [chartTab, setChartTab] = useState<ChartTab>('temperature');
+  const loadedRef = useRef(false);
 
   const month = new Date().getMonth() + 1;
   const pests = getPestsForMonth(month);
@@ -105,26 +127,48 @@ export default function WeatherPage() {
   const isPreMonsoonHeat = month >= 3 && month <= 5;
 
   useEffect(() => {
-    const geoOpts = { timeout: 8000 };
+    // Show cached Bangkok data immediately
+    const cached = getCachedWeather(13.7563, 100.5018);
+    if (cached) {
+      setWeather(cached);
+      setLoading(false);
+      setLocationName('Bangkok');
+    } else {
+      load(13.7563, 100.5018, 'Bangkok');
+    }
+
+    // Then try geolocation in background
     navigator.geolocation?.getCurrentPosition(
       (p) => {
-        setLocationName('Your location');
-        setCoords({ lat: p.coords.latitude, lon: p.coords.longitude });
-        load(p.coords.latitude, p.coords.longitude);
+        const lat = p.coords.latitude;
+        const lon = p.coords.longitude;
+        if (loadedRef.current) return;
+        setCoords({ lat, lon });
+        const localCached = getCachedWeather(lat, lon);
+        if (localCached) {
+          setWeather(localCached);
+          setLoading(false);
+          setLocationName('Your location');
+        } else {
+          load(lat, lon, 'Your location');
+        }
       },
-      () => {
-        setLocationName('Bangkok (default)');
-        load(13.7563, 100.5018);
-      },
-      geoOpts
+      () => { /* stay on Bangkok */ },
+      { timeout: 6000 }
     );
-    if (!navigator.geolocation) load(13.7563, 100.5018);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function load(lat: number, lon: number) {
+  async function load(lat: number, lon: number, name: string) {
     try {
       const res = await fetch(`/api/weather?lat=${lat}&lon=${lon}`);
-      setWeather(await res.json());
+      const data = await res.json();
+      setCachedWeather(lat, lon, data);
+      setWeather(data);
+      setLocationName(name);
+      loadedRef.current = true;
+    } catch (e) {
+      console.error(e);
     } finally {
       setLoading(false);
     }
@@ -139,7 +183,7 @@ export default function WeatherPage() {
     );
     const s = Math.max(0, startIdx);
     const arr = weather.hourly[cfg.key] as number[];
-    return weather.hourly.time.slice(s, s + 48).map((t, i) => ({
+    return weather.hourly.time.slice(s, s + 168).map((t, i) => ({
       time: formatTime(t),
       value: arr[s + i] ?? 0,
     }));
@@ -231,7 +275,7 @@ export default function WeatherPage() {
       {/* Time-series charts */}
       {!loading && weather && (
         <div className="rounded-2xl bg-card border border-border p-4 space-y-3">
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">48-Hour Forecast</p>
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">7-Day Forecast</p>
 
           <div className="flex gap-1.5 overflow-x-auto pb-1">
             {(Object.keys(CHART_CONFIG) as ChartTab[]).map((tab) => (
@@ -332,16 +376,22 @@ export default function WeatherPage() {
         ) : (
           <div className="space-y-3">
             {pests.map((p) => (
-              <div key={p.name} className="space-y-1">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-semibold">{p.emoji} {p.name}</p>
-                  <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
-                    p.severity === 'high' ? 'bg-red-100 text-red-800' :
-                    p.severity === 'medium' ? 'bg-amber-100 text-amber-800' : 'bg-green-100 text-green-800'
-                  }`}>{p.severity}</span>
+              <div key={p.name} className="flex gap-3">
+                <PestIcon type={p.iconType} size={36} />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="text-sm font-semibold">{p.name}</p>
+                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                      p.severity === 'high' ? 'bg-red-100 text-red-800' :
+                      p.severity === 'medium' ? 'bg-amber-100 text-amber-800' : 'bg-green-100 text-green-800'
+                    }`}>{p.severity}</span>
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full border ${
+                      p.type === 'pest' ? 'bg-orange-50 border-orange-200 text-orange-700' : 'bg-purple-50 border-purple-200 text-purple-700'
+                    }`}>{p.type}</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5">{p.signs}</p>
+                  <p className="text-xs text-foreground/70 mt-0.5">Treatment: {p.treatment}</p>
                 </div>
-                <p className="text-xs text-muted-foreground">{p.signs}</p>
-                <p className="text-xs text-foreground/70">Treatment: {p.treatment}</p>
               </div>
             ))}
           </div>

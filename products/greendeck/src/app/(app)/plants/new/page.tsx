@@ -14,6 +14,28 @@ interface AiDetails {
   description?: string;
 }
 
+async function compressImage(file: File): Promise<string> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const MAX = 600;
+      let { width, height } = img;
+      if (width > MAX || height > MAX) {
+        if (width > height) { height = Math.round((height / width) * MAX); width = MAX; }
+        else { width = Math.round((width / height) * MAX); height = MAX; }
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      canvas.getContext('2d')!.drawImage(img, 0, 0, width, height);
+      URL.revokeObjectURL(url);
+      resolve(canvas.toDataURL('image/jpeg', 0.75));
+    };
+    img.src = url;
+  });
+}
+
 export default function NewPlantPage() {
   const router = useRouter();
   const [form, setForm] = useState({
@@ -26,12 +48,14 @@ export default function NewPlantPage() {
     notes: '',
     cover_emoji: '🌿',
   });
+  const [photos, setPhotos] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiDetails, setAiDetails] = useState<AiDetails | null>(null);
   const [aiError, setAiError] = useState<string | null>(null);
   const [aiExpanded, setAiExpanded] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const photoInputRef = useRef<HTMLInputElement>(null);
 
   function update(field: string, value: string) {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -42,6 +66,19 @@ export default function NewPlantPage() {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
   }, []);
+
+  async function handlePhotoSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files ?? []);
+    const remaining = 4 - photos.length;
+    const toProcess = files.slice(0, remaining);
+    const compressed = await Promise.all(toProcess.map(compressImage));
+    setPhotos((prev) => [...prev, ...compressed].slice(0, 4));
+    e.target.value = '';
+  }
+
+  function removePhoto(idx: number) {
+    setPhotos((prev) => prev.filter((_, i) => i !== idx));
+  }
 
   async function fetchAiDetails(name: string) {
     if (!name.trim() || name.length < 3) return;
@@ -87,6 +124,7 @@ export default function NewPlantPage() {
       id: crypto.randomUUID(),
       collector_tag: form.collector_tag || `GD-${String(existing.length + 1).padStart(3, '0')}`,
       added_at: new Date().toISOString(),
+      photos: photos.length > 0 ? photos : undefined,
       watering_needs: aiDetails?.watering,
       sunlight_needs: aiDetails?.sunlight,
       care_level: aiDetails?.care_level,
@@ -102,6 +140,44 @@ export default function NewPlantPage() {
       <div className="flex items-center gap-3">
         <button onClick={() => router.back()} className="text-muted-foreground text-2xl leading-none">‹</button>
         <h1 className="text-2xl font-semibold" style={{ fontFamily: 'var(--font-lora)' }}>New Plant</h1>
+      </div>
+
+      {/* Photo upload */}
+      <div>
+        <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Photos</label>
+        <div className="mt-2 flex items-center gap-2 flex-wrap">
+          {photos.map((src, idx) => (
+            <div key={idx} className="relative w-[50px] h-[50px] flex-shrink-0">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={src} alt={`photo ${idx + 1}`} className="w-full h-full object-cover rounded-xl border border-border" />
+              <button
+                onClick={() => removePhoto(idx)}
+                className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-destructive text-white text-xs flex items-center justify-center leading-none"
+                aria-label="Remove photo"
+              >
+                ×
+              </button>
+            </div>
+          ))}
+          {photos.length < 4 && (
+            <button
+              onClick={() => photoInputRef.current?.click()}
+              className="w-[50px] h-[50px] rounded-xl border border-dashed border-border bg-muted flex items-center justify-center text-lg flex-shrink-0"
+              aria-label="Add photo"
+            >
+              📷
+            </button>
+          )}
+          <input
+            ref={photoInputRef}
+            type="file"
+            accept="image/*"
+            multiple
+            className="hidden"
+            onChange={handlePhotoSelect}
+          />
+        </div>
+        <p className="text-xs text-muted-foreground mt-1">Up to 4 photos · compressed to 600px</p>
       </div>
 
       {/* Emoji picker */}

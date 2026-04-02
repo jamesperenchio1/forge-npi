@@ -1,7 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { createClient } from "@/lib/supabase/client";
+import { useEffect, useState } from "react";
 
 const NAV = [
   {
@@ -82,11 +85,41 @@ const NAV = [
   },
 ];
 
+function SignoutButton() {
+  const router = useRouter();
+  const [loading, setLoading] = useState(false);
+
+  const handleSignout = async () => {
+    setLoading(true);
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    router.push("/login");
+  };
+
+  return (
+    <Button
+      variant="ghost"
+      size="sm"
+      onClick={handleSignout}
+      disabled={loading}
+      className="text-xs"
+    >
+      {loading ? "Signing out..." : "Sign out"}
+    </Button>
+  );
+}
+
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
   return (
     <div className="flex flex-col min-h-screen">
+      <header className="border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-40">
+        <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between h-14">
+          <h1 className="font-semibold text-sm">GreenDeck</h1>
+          <SignoutButton />
+        </div>
+      </header>
       <main className="flex-1 pb-nav">{children}</main>
       <nav className="fixed bottom-0 left-0 right-0 bg-card/90 backdrop-blur-md border-t border-border z-50"
            style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>

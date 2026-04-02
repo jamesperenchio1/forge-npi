@@ -1,9 +1,9 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { NextResponse } from 'next/server';
+import { createClient } from '@/lib/supabase/server';
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY ?? '');
 
-// Model chain: try each in order until one succeeds
 const MODEL_CHAIN = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-flash-8b'];
 
 const PROMPT = (name: string) => `You are a plant expert. Return a JSON object (no markdown, no code blocks, pure JSON only) with information about the plant named "${name}".
@@ -28,16 +28,23 @@ function parseJSON(raw: string) {
   } catch {
     const match = cleaned.match(/\{[\s\S]*\}/);
     if (match) return JSON.parse(match[0]);
-    throw new Error('Could not parse AI response as JSON');
+    throw new Error('No JSON found in response');
   }
 }
 
 function isQuotaError(e: unknown): boolean {
-  const msg = e instanceof Error ? e.message : String(e);
-  return msg.includes('429') || msg.includes('quota') || msg.includes('RESOURCE_EXHAUSTED');
+  if (e instanceof Error) return e.message.includes('429') || e.message.includes('quota');
+  return String(e).includes('429') || String(e).includes('quota');
 }
 
 export async function POST(request: Request) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   if (!process.env.GEMINI_API_KEY) {
     return NextResponse.json({ error: 'Gemini API key not configured' }, { status: 500 });
   }
@@ -56,25 +63,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ details });
     } catch (e: unknown) {
       lastError = e;
-      if (isQuotaError(e)) {
-        // Try next model in chain
-        continue;
-      }
-      // Non-quota error — bail immediately
-      break;
+      if (isQuotaError(e)) continue;
+      return NextResponse.json({ error: String(e) }, { status: 500 });
     }
   }
 
-  const msg = lastError instanceof Error ? lastError.message : String(lastError);
-  const isQuota = isQuotaError(lastError);
-
-  console.error('plant-details error:', msg);
-  return NextResponse.json(
-    {
-      error: isQuota
-        ? 'Gemini API quota exceeded. The free tier limit has been reached. Please try again tomorrow or enable billing on your Google AI project.'
-        : `AI lookup failed: ${msg}`,
-    },
-    { status: isQuota ? 429 : 500 }
-  );
+  return NextResponse.json({ error: `All models failed. Last: ${String(lastError)}` }, { status: 500 });
 }

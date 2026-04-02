@@ -1,6 +1,14 @@
 import { getGeminiModel, buildDoctorPrompt, parseDiagnosis, DOCTOR_SYSTEM_PROMPT } from "@/lib/gemini";
+import { createClient } from "@/lib/supabase/server";
 
 export async function POST(request: Request) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  
+  if (!user) {
+    return Response.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   try {
     const body = await request.json();
     const { imageBase64, mimeType = "image/jpeg", plantName, region = "central", month } = body;
